@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Core Breaker</title>
+<meta name="description" content="Core Breaker — hold to smash crystal, release for armor, break the core." />
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+<div id="cb-root">
+  <canvas id="game-canvas" aria-hidden="true"></canvas>
+
+  <!-- live regions & captions -->
+  <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+  <div id="live-alert" class="sr-only" role="alert" aria-live="assertive"></div>
+  <div id="caption-bar" aria-hidden="true"></div>
+
+  <!-- play HUD -->
+  <header id="hud" class="hidden" aria-label="Round status">
+    <div class="stat"><span class="lbl">Score</span><span class="val" id="hud-score">0</span></div>
+    <div class="stat"><span class="lbl">Best</span><span class="val" id="hud-best">—</span></div>
+    <div class="stat"><span class="lbl">Depth</span><span class="val" id="hud-depth">0/0</span></div>
+    <div class="stat" id="hud-timer-wrap"><span class="lbl">Time</span><span class="val" id="hud-timer">—</span></div>
+    <div class="stat"><span class="lbl">Momentum</span><span class="val" id="hud-mult">×0</span></div>
+    <div class="stat"><span class="lbl">Charge</span><span id="charge-pips" role="img" aria-label="Charge"></span></div>
+    <div class="spacer"></div>
+    <button id="btn-hud-undo" type="button" title="Undo (U)">Undo</button>
+    <button id="btn-hud-pause" type="button" title="Pause (P or Esc)">Pause</button>
+    <div id="hud-objective" role="doc-tip"></div>
+  </header>
+
+  <div id="hintbar" aria-hidden="true"></div>
+
+  <nav id="action-tray" class="hidden" aria-label="Round actions">
+    <button id="btn-hold" type="button">HOLD TO DIVE</button>
+    <button id="btn-tray-undo" type="button">Undo</button>
+  </nav>
+
+  <!-- title / home -->
+  <section id="screen-title" class="screen" aria-labelledby="title-h">
+    <h1 id="title-h" class="title-logo">CORE BREAKER</h1>
+    <p class="subtitle">Hold to smash crystal. Release before armor. Break the core.</p>
+    <div class="menu-col">
+      <button id="btn-play" type="button" class="primary">Play</button>
+      <button id="btn-daily" type="button">Daily Challenge</button>
+      <button id="btn-journey" type="button">Journey</button>
+      <button id="btn-practice" type="button">Practice</button>
+      <button id="btn-challenge" type="button">Challenges</button>
+      <button id="btn-score" type="button">Score Chase</button>
+    </div>
+    <div class="menu-row">
+      <button id="btn-settings" type="button">Settings</button>
+      <button id="btn-help" type="button">How to Play</button>
+    </div>
+    <p id="title-progress" class="small"></p>
+    <p id="title-compat" class="small" role="note"></p>
+  </section>
+
+  <!-- journey level select -->
+  <section id="screen-journey" class="screen hidden" aria-labelledby="journey-h">
+    <div class="card">
+      <h2 id="journey-h">Journey</h2>
+      <p class="small">40 authored descents. Mastery stages glow gold. Earn stars to unlock themes.</p>
+      <div id="journey-grid" class="level-grid"></div>
+    </div>
+    <button type="button" class="back-btn" data-back>Back</button>
+  </section>
+
+  <!-- practice setup -->
+  <section id="screen-practice" class="screen hidden" aria-labelledby="practice-h">
+    <div class="card">
+      <h2 id="practice-h">Practice</h2>
+      <p class="small">Unranked. Undo and hints are on. Pick a difficulty and theme.</p>
+      <div id="practice-list" class="choice-list"></div>
+      <div class="settings-row">
+        <label for="practice-theme">Theme</label>
+        <select id="practice-theme"></select>
+      </div>
+    </div>
+    <button type="button" class="back-btn" data-back>Back</button>
+  </section>
+
+  <!-- challenge list -->
+  <section id="screen-challenge" class="screen hidden" aria-labelledby="challenge-h">
+    <div class="card">
+      <h2 id="challenge-h">Challenges</h2>
+      <p class="small">Constrained goals: timers, no charge cell, no assists. Ranked locally.</p>
+      <div id="challenge-list" class="choice-list"></div>
+    </div>
+    <button type="button" class="back-btn" data-back>Back</button>
+  </section>
+
+  <!-- daily -->
+  <section id="screen-daily" class="screen hidden" aria-labelledby="daily-h">
+    <div class="card">
+      <h2 id="daily-h">Daily Challenge</h2>
+      <p id="daily-info"></p>
+      <p id="daily-status" class="small"></p>
+      <p id="daily-countdown" class="small"></p>
+      <button id="btn-daily-play" type="button" class="primary">Dive Today’s Shaft</button>
+    </div>
+    <button type="button" class="back-btn" data-back>Back</button>
+  </section>
+
+  <!-- score chase -->
+  <section id="screen-score" class="screen hidden" aria-labelledby="score-h">
+    <div class="card">
+      <h2 id="score-h">Score Chase — Endless Shaft</h2>
+      <p>The shaft never bottoms out and armor thickens with depth. One dive, one score. No undo, no hints.</p>
+      <p class="small">Your best: <strong id="score-best">—</strong></p>
+      <ol id="score-board" class="small"></ol>
+      <button id="btn-score-play" type="button" class="primary">Start Endless Dive</button>
+    </div>
+    <button type="button" class="back-btn" data-back>Back</button>
+  </section>
+
+  <!-- mode intro / tutorial lesson -->
+  <div id="overlay-intro" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="intro-h">
+    <div class="card">
+      <h2 id="intro-h"></h2>
+      <p id="intro-text"></p>
+      <p id="intro-meta" class="small"></p>
+      <div class="menu-col">
+        <button id="btn-intro-start" type="button" class="primary">Start</button>
+        <button id="btn-intro-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- pause -->
+  <div id="overlay-pause" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-h">
+    <div class="card">
+      <h2 id="pause-h">Paused</h2>
+      <div class="menu-col">
+        <button id="btn-resume" type="button" class="primary">Resume</button>
+        <button id="btn-restart" type="button">Restart</button>
+        <button id="btn-pause-settings" type="button">Settings</button>
+        <button id="btn-pause-help" type="button">How to Play</button>
+        <button id="btn-quit" type="button" class="danger">Leave Round</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- results -->
+  <div id="overlay-results" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="res-headline">
+    <div class="card">
+      <h2 id="res-headline"></h2>
+      <p id="res-reason" class="small"></p>
+      <table id="res-breakdown"></table>
+      <p id="res-progress" class="small"></p>
+      <p id="res-achievements" class="small"></p>
+      <p id="res-replay" class="small"></p>
+      <div class="menu-col">
+        <button id="btn-retry" type="button" class="primary">Retry</button>
+        <button id="btn-next" type="button">Next Stage</button>
+        <button id="btn-res-exit" type="button">Exit to Title</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- settings -->
+  <div id="overlay-settings" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-h">
+    <div class="card">
+      <h2 id="settings-h">Settings</h2>
+      <h3>Audio</h3>
+      <div class="settings-row"><label for="set-music">Music</label><input id="set-music" type="range" min="0" max="100" /></div>
+      <div class="settings-row"><label for="set-sfx">Effects</label><input id="set-sfx" type="range" min="0" max="100" /></div>
+      <div class="settings-row"><label for="set-amb">Ambience</label><input id="set-amb" type="range" min="0" max="100" /></div>
+      <div class="settings-row"><label for="set-mute">Mute all</label><input id="set-mute" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-captions">Sound captions</label><input id="set-captions" type="checkbox" /></div>
+      <h3>Graphics</h3>
+      <div class="settings-row"><label for="set-quality">Quality tier</label>
+        <select id="set-quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      <div class="settings-row"><label for="set-motion">Reduced motion</label><input id="set-motion" type="checkbox" /></div>
+      <h3>Accessibility &amp; controls</h3>
+      <div class="settings-row"><label for="set-contrast">High contrast</label><input id="set-contrast" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-large-text">Larger text</label><input id="set-large-text" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-lefty">Left-handed tray</label><input id="set-lefty" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-toggle">Toggle instead of hold</label><input id="set-toggle" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-assist">Timing assist (stronger hints)</label><input id="set-assist" type="checkbox" /></div>
+      <h3>Theme</h3>
+      <div class="settings-row"><label for="set-theme">Practice theme</label><select id="set-theme"></select></div>
+      <div class="menu-col" style="margin-top:12px">
+        <button id="btn-settings-close" type="button" class="primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- help -->
+  <div id="overlay-help" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="help-h">
+    <div class="card">
+      <h2 id="help-h">How to Play</h2>
+      <div id="help-cards"></div>
+      <h3>Controls</h3>
+      <ul id="help-controls"></ul>
+      <div class="menu-col" style="margin-top:12px">
+        <button id="btn-help-close" type="button" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden" role="status"></div>
+</div>
+
+<script type="module">
+  import * as THREE from './vendor/three.module.min.js';
+  window.THREE = THREE;
+</script>
+<script defer src="./js/rng.js"></script>
+<script defer src="./js/content.js"></script>
+<script defer src="./js/rules.js"></script>
+<script defer src="./js/session.js"></script>
+<script defer src="./js/audio.js"></script>
+<script defer src="./js/render.js"></script>
+<script defer src="./js/main.js"></script>
+<noscript><p style="padding:1em;font-size:18px">JavaScript is required to play Core Breaker.</p></noscript>
+</body>
+</html>

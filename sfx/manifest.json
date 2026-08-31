@@ -1,0 +1,74 @@
+[
+  {
+    "name": "dive-start",
+    "seconds": 1,
+    "prompt": "Short punchy pneumatic whoosh with a quick downward pitch sweep, like a pod launching into a shaft, dry, no reverb tail.",
+    "event": "sfxPress"
+  },
+  {
+    "name": "hover-release",
+    "seconds": 1,
+    "prompt": "Soft airy brake hiss with a gentle rising flutter, like a descent pod catching lift and hovering, short and clean.",
+    "event": "sfxRelease"
+  },
+  {
+    "name": "crystal-break",
+    "seconds": 1,
+    "prompt": "Sharp glassy crystalline shatter, brittle high-frequency shards scattering, single decisive crack followed by tiny fragment tinkling.",
+    "event": "sfxBreak"
+  },
+  {
+    "name": "gap-pass",
+    "seconds": 1,
+    "prompt": "Fast clean air whoosh, like a small object slipping through a narrow opening, brief rising swoosh with a light whistle.",
+    "event": "sfxPass"
+  },
+  {
+    "name": "overdrive-surge",
+    "seconds": 2,
+    "prompt": "Heavy metallic breach: a thick armor plate punched through with a deep crunchy slam, followed by an energetic electric surge swell.",
+    "event": "sfxOverdrive"
+  },
+  {
+    "name": "charge-pip",
+    "seconds": 1,
+    "prompt": "Tiny bright mechanical click-blip, like an energy cell slotting into place with a soft electronic chirp, very short.",
+    "event": "sfxCharge"
+  },
+  {
+    "name": "armor-crash",
+    "seconds": 2,
+    "prompt": "Violent metal-on-metal collision, a pod smashing into a solid armored wall, deep clang with rattling debris and a low rumble decay.",
+    "event": "sfxCrash"
+  },
+  {
+    "name": "core-reached",
+    "seconds": 3,
+    "prompt": "Triumphant crystalline chime sequence: three rising bell-like tones ringing out as a reactor core breaks open, shimmering harmonic tail.",
+    "event": "sfxWin"
+  },
+  {
+    "name": "run-ended",
+    "seconds": 2,
+    "prompt": "Low mournful power-down, machinery winding to a stop with a falling pitch drone and a soft final clunk.",
+    "event": "sfxLose"
+  },
+  {
+    "name": "ui-tick",
+    "seconds": 1,
+    "prompt": "Very short dry UI tick, a soft plastic button tap with a subtle high click, neutral and unobtrusive.",
+    "event": "sfxUi"
+  },
+  {
+    "name": "achievement-unlock",
+    "seconds": 2,
+    "prompt": "Bright two-note badge-unlock jingle, small metallic chime followed by a higher sparkly chime, celebratory but compact.",
+    "event": "sfxAchievement"
+  },
+  {
+    "name": "countdown-beep",
+    "seconds": 1,
+    "prompt": "Single clean electronic countdown beep, medium pitch, short envelope, like a timer on a diving console.",
+    "event": "sfxCountdown"
+  }
+]
