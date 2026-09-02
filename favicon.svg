@@ -1,12 +1,8 @@
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
-<defs><linearGradient id='c' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#9be8ff'/><stop offset='1' stop-color='#3f8fdd'/></linearGradient></defs>
-<rect width='64' height='64' rx='14' fill='#141126'/>
-<path d='M10 18h18l-3 6H13Z' fill='#5b4f8f'/>
-<path d='M54 18H36l3 6h12Z' fill='#5b4f8f'/>
-<path d='M10 40h12l-3 6h-9Z' fill='#4a4076'/>
-<path d='M54 40H42l3 6h9Z' fill='#4a4076'/>
-<path d='M32 8 40 22 32 52 24 22Z' fill='url(#c)'/>
-<path d='M32 8 40 22 32 26 24 22Z' fill='#d8f4ff'/>
-<path d='M24 22 32 26 32 52Z' fill='#2b6cb8'/>
-<circle cx='32' cy='56' r='3.4' fill='#ffd166'/>
+  <rect width='64' height='64' rx='13' fill='#0b0918'/>
+  <circle cx='32' cy='50' r='9' fill='#ffd166'/>
+  <path d='M8 29 L26 29 L32 36 L38 29 L56 29 L56 38 L8 38 Z' fill='#9be8ff'/>
+  <path d='M32 7 L42 24 L35 24 L35 29 L29 29 L29 24 L22 24 Z' fill='#f2eefc'/>
+  <path d='M17 42 L24 42 L20.5 48 Z' fill='#9be8ff'/>
+  <path d='M40 42 L47 42 L43.5 48 Z' fill='#9be8ff'/>
 </svg>
