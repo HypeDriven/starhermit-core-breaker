@@ -1,0 +1,11 @@
+{
+  "name": "core-breaker",
+  "private": true,
+  "scripts": {
+    "test:e2e": "node tests/e2e.mjs",
+    "test": "node tests/run_tests.js"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
+  }
+}

@@ -163,6 +163,7 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
   background: var(--panel); border: 1px solid var(--accent-2); border-radius: 12px;
   padding: 10px 20px; font-weight: 600; color: var(--accent-2);
   transition: opacity 0.4s;
+  pointer-events: none; /* purely informational: never swallow taps on the HUD */
 }
 
 /* ---------- results ---------- */

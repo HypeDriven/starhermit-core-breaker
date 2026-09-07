@@ -25,6 +25,30 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const SCORES_FILE = process.env.CB_SCORES_FILE || path.join(ROOT, 'tools', 'scores.json');
 const MAX_BODY = 256 * 1024;
 const MAX_LOG = 20000;
+const MAX_RUN_TICKS = 60 * 60 * 15; // 15 minutes of simulated play per replay
+
+// Generous bounds around every shipped ruleset. A submission is replayed
+// server-side, so an unbounded config (e.g. layers: 1e9) would otherwise let
+// one request generate arbitrarily much work before the hash check runs.
+const CFG_LIMITS = {
+  layers: [1, 500], sectors: [3, 32], rotSpeed: [0, 500], fallSpeed: [1, 1000],
+  chargeMax: [0, 64], timeLimitSec: [0, 3600]
+};
+
+function checkConfigBounds(cfg) {
+  for (const key in CFG_LIMITS) {
+    const v = cfg[key] === undefined || cfg[key] === null ? 0 : cfg[key];
+    if (!Number.isInteger(v) || v < CFG_LIMITS[key][0] || v > CFG_LIMITS[key][1]) return 'bad-config:' + key;
+  }
+  for (const key of ['armorPct', 'gapPct']) {
+    const v = cfg[key] === undefined ? 0 : cfg[key];
+    if (typeof v !== 'number' || !(v >= 0) || v > 1) return 'bad-config:' + key;
+  }
+  if (cfg.forceLayers && (!Array.isArray(cfg.forceLayers) || cfg.forceLayers.length > CFG_LIMITS.layers[1])) {
+    return 'bad-config:forceLayers';
+  }
+  return null;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -60,6 +84,8 @@ function validateSubmission(body) {
   if (!Number.isInteger(body.score) || body.score < 0 || body.score > 1e7) return { error: 'implausible-score' };
   if (!Array.isArray(body.log) || body.log.length > MAX_LOG) return { error: 'bad-log' };
   if (!Number.isInteger(body.hash)) return { error: 'missing-hash' };
+  const boundsErr = checkConfigBounds(body.cfg);
+  if (boundsErr) return { error: boundsErr };
 
   let state;
   try { state = Rules.createGame(body.cfg); } catch (e) { return { error: 'bad-config' }; }
@@ -72,6 +98,7 @@ function validateSubmission(body) {
     const r = Rules.applyCommand(state, cmd);
     if (!r.ok) return { error: 'illegal-command:' + r.reason };
     state = r.state;
+    if (state.tick > MAX_RUN_TICKS) return { error: 'run-too-long' };
   }
 
   // settle: advance to terminal (or a bounded horizon for endless runs)
@@ -80,7 +107,7 @@ function validateSubmission(body) {
     const r = Rules.applyCommand(state, { type: 'wait', atTick: state.tick + 600 });
     if (!r.ok) break;
     state = r.state;
-    if (state.cfg.endless && state.tick > 60 * 60 * 15) break; // 15-min cap
+    if (state.tick > MAX_RUN_TICKS) break;
   }
 
   const hash = Rules.hashState(state);
@@ -164,10 +191,13 @@ const server = http.createServer((req, res) => {
   if (p.startsWith('/api/')) return json(res, 404, { error: 'not-found' });
 
   // static files (distribution root only; no traversal)
-  let rel = decodeURIComponent(p);
+  let rel;
+  try { rel = decodeURIComponent(p); }       // malformed %-escapes must not throw
+  catch (e) { res.writeHead(400); return res.end('Bad request'); }
   if (rel === '/') rel = '/index.html';
   const filePath = path.normalize(path.join(ROOT, rel));
-  if (!filePath.startsWith(ROOT) || filePath.includes('..')) {
+  if (!filePath.startsWith(ROOT + path.sep) || filePath.includes('..') ||
+      /(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(filePath.slice(ROOT.length))) {
     res.writeHead(403); return res.end('Forbidden');
   }
   fs.readFile(filePath, (err, data) => {

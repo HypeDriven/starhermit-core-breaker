@@ -30,6 +30,7 @@
   var playCfg = null, playKind = null, playName = '';
   var playCtx = null;         // {lesson?, levelIndex?, date?, challenge?}
   var tickTimer = null, rafId = null, lastFrameTs = 0;
+  var countdownTimer = null, resultsTimer = null;
   var paused = false, countingDown = false, resultsShown = false;
   var inputLog = [];          // replay envelope: ordered validated commands
   var cmdSeq = 0;
@@ -63,7 +64,11 @@
     el.classList.remove('hidden');
     el.style.opacity = '1';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.style.opacity = '0'; }, 2600);
+    toastTimer = setTimeout(function () {
+      el.style.opacity = '0';
+      // re-hide once faded so it never lingers over the HUD
+      toastTimer = setTimeout(function () { el.classList.add('hidden'); }, 500);
+    }, 2600);
   }
 
   // ---------- screens ----------
@@ -329,7 +334,8 @@
     if (cfg.chargeMax) meta.push('charge cell ×' + cfg.chargeMax); else meta.push('no charge cell');
     meta.push(cfg.mechanics.undo ? 'undo on' : 'no undo');
     meta.push(cfg.mechanics.hint ? 'hints on' : 'no hints');
-    meta.push(kind === 'practice' || kind === 'tutorial' ? 'unranked' : 'ranked locally');
+    meta.push(kind === 'tutorial' ? 'unranked'
+      : kind === 'practice' ? 'local best only' : 'ranked locally');
     $('intro-meta').textContent = meta.join(' · ');
     openOverlay('overlay-intro');
   }
@@ -338,6 +344,11 @@
 
   function startPlay() {
     closeOverlay('overlay-intro');
+    // a restart may arrive mid-countdown or mid-round: cancel every pending
+    // timer from the previous attempt before building the new one
+    stopLoops();
+    clearInterval(countdownTimer); countdownTimer = null;
+    clearTimeout(resultsTimer); resultsTimer = null;
     playState = Rules.createGame(playCfg);
     playName = playCfg.name || playKind;
     inputLog = [];
@@ -365,13 +376,14 @@
     announce('Get ready', true);
     $('hintbar').textContent = '3';
     Audio.sfxCountdown();
-    var cd = setInterval(function () {
+    countdownTimer = setInterval(function () {
+      if (paused) return; // a pause during the countdown holds it, too
       countdownLeft--;
       if (countdownLeft > 0) {
         $('hintbar').textContent = String(countdownLeft);
         Audio.sfxCountdown();
       } else {
-        clearInterval(cd);
+        clearInterval(countdownTimer); countdownTimer = null;
         countingDown = false;
         $('hintbar').textContent = '';
         announce('Dive! ' + objectiveText(), true);
@@ -636,6 +648,10 @@
   }
   function quitToTitle() {
     stopLoops();
+    clearInterval(countdownTimer); countdownTimer = null;
+    clearTimeout(resultsTimer); resultsTimer = null;
+    countingDown = false;
+    paused = false;
     playState = null;
     Audio.stopMusic();
     $('hud').classList.add('hidden');
@@ -644,6 +660,9 @@
     closeOverlay('overlay-pause');
     if (!$('overlay-results').classList.contains('hidden')) closeOverlay('overlay-results');
     showScreen('screen-title', true);
+    // resume the idle shaft render behind the menus
+    lastFrameTs = 0;
+    rafId = requestAnimationFrame(frameLoop);
   }
 
   // backgrounding pauses solo simulation
@@ -662,6 +681,7 @@
   // ---------- terminal / results ----------
 
   function bestKey() {
+    if (playKind === 'tutorial') return 'tutorial'; // lessons never touch ranked boards
     if (playKind === 'practice') return 'practice-' + (playCtx.presetId || playCfg.id);
     if (playKind === 'challenge') return 'challenge-' + playCfg.id;
     if (playKind === 'score') return 'score';
@@ -675,10 +695,12 @@
     stopLoops();
     // settle render for a beat, then show results
     rafId = requestAnimationFrame(frameLoop);
-    setTimeout(showResults, 900);
+    resultsTimer = setTimeout(showResults, 900);
   }
 
   function showResults() {
+    resultsTimer = null;
+    if (!playState || !playState.terminal) return; // round was abandoned mid-settle
     var s = playState, t = s.terminal;
     cancelAnimationFrame(rafId); rafId = null;
     Audio.stopMusic();
@@ -768,6 +790,9 @@
 
   function submitToServer(replay, s) {
     if (!window.fetch || location.protocol === 'file:') return;
+    // lessons are not scored, and practice shafts use a throwaway random seed:
+    // neither belongs on a shared board
+    if (playKind === 'tutorial' || playKind === 'practice') return;
     fetch('/api/v1/score', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -870,6 +895,7 @@
     idx = Math.min(idx, Content.JOURNEY.length - 1);
     openIntro(Content.JOURNEY[idx], 'journey', { levelIndex: idx });
   });
+  bind('btn-learn', openLearnMenu);
   bind('btn-daily', function () { showScreen('screen-daily'); });
   bind('btn-journey', function () { showScreen('screen-journey'); });
   bind('btn-practice', function () { showScreen('screen-practice'); });
