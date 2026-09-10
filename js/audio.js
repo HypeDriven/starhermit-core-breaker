@@ -63,7 +63,11 @@
     lose: 'run-ended',
     ui: 'ui-tick',
     achievement: 'achievement-unlock',
-    countdown: 'countdown-beep'
+    countdown: 'countdown-beep',
+    undo: 'undo-rewind',
+    lesson: 'lesson-complete',
+    timerWarn: 'timer-warning',
+    newBest: 'new-best'
   };
   var sampleState = {};   // name -> 'loading' | 'ready' | 'failed'
   var sampleBuffers = {}; // name -> AudioBuffer
@@ -214,6 +218,22 @@
       }
       caption('achievement unlocked');
     },
-    sfxCountdown: function () { if (!trySample('countdown')) blip(600, 0.1, 0.35, 'sine'); }
+    sfxCountdown: function () { if (!trySample('countdown')) blip(600, 0.1, 0.35, 'sine'); },
+    sfxUndo: function () { if (!trySample('undo')) blip(300, 0.16, 0.4, 'triangle', 520); caption('rewind'); },
+    sfxLesson: function () {
+      if (!trySample('lesson')) { blip(659, 0.18, 0.4); setTimeout(function () { blip(988, 0.3, 0.4); }, 120); }
+      caption('lesson complete');
+    },
+    sfxTimerWarn: function () {
+      if (!trySample('timerWarn')) { blip(180, 0.12, 0.45, 'square'); setTimeout(function () { blip(180, 0.12, 0.45, 'square'); }, 160); }
+      caption('containment warning');
+    },
+    sfxNewBest: function () {
+      if (!trySample('newBest')) {
+        blip(784, 0.15, 0.4); setTimeout(function () { blip(988, 0.15, 0.4); }, 110);
+        setTimeout(function () { blip(1319, 0.35, 0.4); }, 220);
+      }
+      caption('new personal best');
+    }
   };
 })();

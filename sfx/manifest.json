@@ -70,5 +70,29 @@
     "seconds": 1,
     "prompt": "Single clean electronic countdown beep, medium pitch, short envelope, like a timer on a diving console.",
     "event": "sfxCountdown"
+  },
+  {
+    "name": "undo-rewind",
+    "seconds": 1,
+    "prompt": "Short reversed air whoosh with a quick tape-rewind flutter ending in a soft mechanical snap into place, clean and dry, no reverb tail.",
+    "event": "sfxUndo"
+  },
+  {
+    "name": "lesson-complete",
+    "seconds": 2,
+    "prompt": "Warm short confirmation chime: a soft glassy bell followed by a gentle upward resolving tone, calm and encouraging, brief with a light shimmer tail.",
+    "event": "sfxLesson"
+  },
+  {
+    "name": "timer-warning",
+    "seconds": 1,
+    "prompt": "Urgent muffled reactor alarm: two quick low electronic klaxon pulses with a slight metallic resonance, short and tense, no tail.",
+    "event": "sfxTimerWarn"
+  },
+  {
+    "name": "new-best",
+    "seconds": 2,
+    "prompt": "Bright ascending three-note crystalline arpeggio with a soft sparkling shimmer on the last note, celebratory and compact.",
+    "event": "sfxNewBest"
   }
 ]

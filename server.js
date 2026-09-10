@@ -58,6 +58,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.opus': 'audio/ogg; codecs=opus',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8'
@@ -69,7 +70,10 @@ let boards = {};
 try { boards = JSON.parse(fs.readFileSync(SCORES_FILE, 'utf8')); } catch (e) { boards = {}; }
 
 function saveBoards() {
-  try { fs.writeFileSync(SCORES_FILE, JSON.stringify(boards)); } catch (e) {}
+  try {
+    fs.mkdirSync(path.dirname(SCORES_FILE), { recursive: true });
+    fs.writeFileSync(SCORES_FILE, JSON.stringify(boards));
+  } catch (e) {}
 }
 
 // ---------- replay validation ----------

@@ -68,6 +68,11 @@ p { max-width: 70ch; }
   background: radial-gradient(ellipse at 50% 30%, rgba(42, 35, 80, 0.85), rgba(11, 9, 24, 0.97));
   overflow-y: auto;
 }
+/* title backdrop: authored key art under a dark veil; menus stay readable if it fails to load */
+#screen-title {
+  background-image: linear-gradient(rgba(11, 9, 24, 0.62), rgba(11, 9, 24, 0.9)), url("../assets/key-art.webp");
+  background-size: cover; background-position: center;
+}
 .screen .card {
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 14px; padding: 18px 22px; max-width: 640px; width: 100%;
@@ -167,6 +172,11 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
 }
 
 /* ---------- results ---------- */
+.res-art {
+  display: block; width: 100%; max-height: 150px; object-fit: cover;
+  border-radius: 10px; border: 1px solid var(--panel-border); margin: 4px 0 8px;
+}
+@media (max-height: 600px) { .res-art { max-height: 90px; } }
 #res-breakdown { width: 100%; border-collapse: collapse; margin: 10px 0; }
 #res-breakdown td { padding: 3px 8px; }
 #res-breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }

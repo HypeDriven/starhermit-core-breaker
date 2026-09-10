@@ -37,6 +37,7 @@
   var serverOffsetMs = null;  // round-trip-adjusted server time offset
   var screenStack = ['screen-title'];
   var countdownLeft = 0;
+  var timerWarned = false;    // one containment warning per round
 
   // ---------- live announcements ----------
 
@@ -355,6 +356,7 @@
     cmdSeq = 0;
     resultsShown = false;
     paused = false;
+    timerWarned = false;
 
     for (var i = 0; i < SCREENS.length; i++) $(SCREENS[i]).classList.add('hidden');
     screenStack = ['screen-title'];
@@ -456,6 +458,7 @@
         Session.markTutorialDone(playCtx.lesson.id);
         announce('Lesson complete: ' + playCtx.lesson.title, true);
         toast('Lesson complete: ' + playCtx.lesson.title);
+        Audio.sfxLesson();
       }
     }
   }
@@ -483,6 +486,7 @@
       var left = playCfg.timeLimitSec * 1000 - s.elapsedMs;
       $('hud-timer').textContent = fmtTime(Math.max(0, left));
       $('hud-timer').style.color = left < 10000 ? 'var(--danger)' : '';
+      if (left < 10000 && left > 0 && !timerWarned && !s.terminal) { timerWarned = true; Audio.sfxTimerWarn(); announce('Containment vents in 10 seconds.', false); }
     }
     $('hud-mult').textContent = '×' + s.mult;
     var pips = $('charge-pips');
@@ -565,7 +569,7 @@
     if (!r.ok) { announce('Nothing to undo.', false); return; }
     playState = r.state;
     inputLog.push(cmd);
-    Audio.sfxRelease();
+    Audio.sfxUndo();
     announce('Rewound to your last release.', false);
     handleEvents(r.events);
     updateHUD();
@@ -748,8 +752,13 @@
     html += '<tr class="total"><td>Total</td><td>' + fmtScore(s.score.total) + '</td></tr>';
     $('res-breakdown').innerHTML = html;
 
+    // results illustration: authored key art per outcome, hidden if it fails to load
+    var art = $('res-art');
+    art.classList.remove('hidden');
+    art.src = won ? './assets/core-reached.webp' : './assets/dive-over.webp';
+
     var prog = [];
-    if (isNewBest) prog.push('New personal best!');
+    if (isNewBest) { prog.push('New personal best!'); if (playKind !== 'tutorial') Audio.sfxNewBest(); }
     if (playKind === 'journey' && won) {
       prog.push(parMet ? '★★ Par beaten' : '★ Stage clear');
       var stars = Session.totalStars();
@@ -970,6 +979,7 @@
     renderChallengeList();
     bindSettings();
     Audio.onCaption(caption);
+    $('res-art').addEventListener('error', function () { $('res-art').classList.add('hidden'); });
     syncServerTime();
     showScreen('screen-title', true);
     // idle render behind menus

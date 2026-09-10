@@ -1,6 +1,6 @@
 # SFX manifest — core-breaker
 
-Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-normalized; 100 inference steps).
+Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-normalized; 100 inference steps). Canonical binding list: `manifest.txt`.
 
 | file | event | prompt |
 |---|---|---|
@@ -16,3 +16,7 @@ Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-no
 | ui-tick.opus | sfxUi | Very short dry UI tick, a soft plastic button tap with a subtle high click, neutral and unobtrusive. |
 | achievement-unlock.opus | sfxAchievement | Bright two-note badge-unlock jingle, small metallic chime followed by a higher sparkly chime, celebratory but compact. |
 | countdown-beep.opus | sfxCountdown | Single clean electronic countdown beep, medium pitch, short envelope, like a timer on a diving console. |
+| undo-rewind.opus | sfxUndo | Short reversed air whoosh with a quick tape-rewind flutter ending in a soft mechanical snap into place, clean and dry, no reverb tail. |
+| lesson-complete.opus | sfxLesson | Warm short confirmation chime: a soft glassy bell followed by a gentle upward resolving tone, calm and encouraging, brief with a light shimmer tail. |
+| timer-warning.opus | sfxTimerWarn | Urgent muffled reactor alarm: two quick low electronic klaxon pulses with a slight metallic resonance, short and tense, no tail. |
+| new-best.opus | sfxNewBest | Bright ascending three-note crystalline arpeggio with a soft sparkling shimmer on the last note, celebratory and compact. |
