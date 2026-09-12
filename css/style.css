@@ -67,7 +67,10 @@ p { max-width: 70ch; }
              calc(20px + var(--safe-inset-bottom)) calc(16px + var(--safe-inset-left));
   background: radial-gradient(ellipse at 50% 30%, rgba(42, 35, 80, 0.85), rgba(11, 9, 24, 0.97));
   overflow-y: auto;
+  /* overflowing content stays reachable from the top instead of centring off-screen */
+  justify-content: safe center;
 }
+.screen > * { flex-shrink: 0; }
 /* title backdrop: authored key art under a dark veil; menus stay readable if it fails to load */
 #screen-title {
   background-image: linear-gradient(rgba(11, 9, 24, 0.62), rgba(11, 9, 24, 0.9)), url("../assets/key-art.webp");

@@ -15,6 +15,7 @@
   var STRIKER_Y = 0;           // striker rests at world origin height
   var CAM_POS = { x: 0, y: 4.6, z: 9.2 };
   var CAM_LOOK = { x: 0, y: -1.2, z: 0 };
+  var camBase = { x: CAM_POS.x, y: CAM_POS.y, z: CAM_POS.z }; // fitted per aspect (see fitCamera)
   var WINDOW_ABOVE = 3, WINDOW_BELOW = 12; // rendered layers around depth
   var PARTICLE_POOL = 140;
 
@@ -282,7 +283,7 @@
       syncPips(state);
       // camera follows a touch as depth grows (authored drift, interruptible)
       var camDrop = reducedMotion ? 0 : Math.min(1.2, state.depth * 0.05);
-      camera.position.y += ((CAM_POS.y - camDrop) - camera.position.y) * Math.min(1, dt * 2);
+      camera.position.y += ((camBase.y - camDrop) - camera.position.y) * Math.min(1, dt * 2);
       camera.lookAt(CAM_LOOK.x, CAM_LOOK.y - camDrop * 0.5, CAM_LOOK.z);
     }
 
@@ -304,9 +305,9 @@
       shakeT = Math.max(0, shakeT - dt * 3);
       var a = shakeAmp * shakeT;
       camera.position.x = (avRng.next() - 0.5) * 2 * a;
-      camera.position.z = CAM_POS.z + (avRng.next() - 0.5) * 2 * a;
+      camera.position.z = camBase.z + (avRng.next() - 0.5) * 2 * a;
     } else {
-      camera.position.x = 0; camera.position.z = CAM_POS.z;
+      camera.position.x = 0; camera.position.z = camBase.z;
     }
 
     renderer.render(scene, camera);
@@ -336,6 +337,25 @@
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    fitCamera(w / h);
+  }
+
+  // Narrow aspect ratios pull the camera back along its authored line of sight
+  // until the whole ring (plus striker) fits horizontally with a margin, leaving
+  // the top/bottom HUD bands clear.
+  function fitCamera(aspect) {
+    if (!camera) return;
+    var dir = new THREE.Vector3(CAM_POS.x - CAM_LOOK.x, CAM_POS.y - CAM_LOOK.y, CAM_POS.z - CAM_LOOK.z);
+    var baseDist = dir.length();
+    dir.normalize();
+    var halfFov = camera.fov * Math.PI / 360;
+    var needHalfW = (RADIUS + 1.4);
+    var freeW = aspect < 1 ? 0.84 : 0.95;
+    var distW = needHalfW / (Math.tan(halfFov) * aspect * freeW);
+    var dist = Math.max(baseDist, distW);
+    camBase = { x: CAM_LOOK.x + dir.x * dist, y: CAM_LOOK.y + dir.y * dist, z: CAM_LOOK.z + dir.z * dist };
+    camera.position.set(camBase.x, camBase.y, camBase.z);
+    camera.lookAt(CAM_LOOK.x, CAM_LOOK.y, CAM_LOOK.z);
   }
 
   window.CBRender = {
