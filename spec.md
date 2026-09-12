@@ -204,11 +204,11 @@ Manifest: `starhermit.txt` declares `name=Core Breaker`, `launch=index.html`, `o
 |---|---|
 | Game script (`server=server.js`) | Used. Serves the distribution; `GET /api/v1/time` (clock sync), `GET /api/v1/daily?date=` (immutable daily metadata), `GET /api/v1/leaderboard?board=`, `POST /api/v1/score` (replays the command log through `rules.js`, rejects stale content version, out-of-bounds configs, illegal commands, hash or score mismatch; boards capped at 50 entries in `tools/scores.json`) |
 | Server time | Used. `syncServerTime` computes a round-trip-adjusted offset; the daily countdown says "(server time)" or "(local clock)" |
-| Identity / profile | Not used. Submissions carry the fixed name `local pilot` |
+| Identity / profile | Used when hosted. `#game_token=<jwt>` read from the URL fragment (stripped after the read; query forms for local dev), decoded for `sub` + `game_scope` (never hard-coded), sent as `Authorization: Bearer` on every hosted call, re-minted every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry). The title shows "Playing as <nickname> · sync status" from `GET /api/v1/users/{sub}/profile` (never usernames, never `/api/v1/me`; `Player <id8>` fallback); submissions carry the account nickname + id (was the fixed `local pilot`) |
 | Presence, activity, sessions, rooms, chat, voice | Not used (solo game) |
-| Leaderboards | Server boards are written and validated; the client displays only its local board |
-| Achievements | Local only (`localStorage`), not delivered to the platform |
-| Cloud save | Not used; progress is the local checksummed document `corebreaker.progress.v1` |
+| Leaderboards | Server boards are written and validated (its-backend route, graceful offline); when hosted with a `leaderboardId`, the Score Chase screen also reads the platform board via `GET /api/v1/games/{slug}` → `GET /api/v1/leaderboards/{id}/entries` (nicknames resolved, own row marked) above the local board |
+| Achievements | Local only (`localStorage`, part of the cloud-saved doc), not delivered to the platform |
+| Cloud save | Used when hosted: the checksummed session doc mirrors to one zip+base64 slot at `GET/PUT /api/v1/me/cloud-saves/{slug}` — remote wins on boot (`CBSession.importWrapped` validates version + checksum), saves debounce 2 s and flush on `pagehide`/hidden with keepalive, sync status on the title. localStorage stays the offline cache |
 
 The game is fully playable with the server unreachable or from `file:` (all fetches are guarded and failures are silent).
 
@@ -247,7 +247,7 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 ## 16. Known limitations
 
 - English only; no locale switching (see intent below).
-- The client never reads `GET /api/v1/leaderboard`; Score Chase shows the local board, and the copy "hosted boards compare with friends" describes the server side only.
+- The own-server `GET /api/v1/leaderboard` is still not read; the hosted Score Chase shows the platform leaderboard instead.
 - All submissions are named `local pilot`, so server boards cannot tell players apart; duplicates are collapsed by name + score + seed + duration.
 - The `daily` and `journey` server boards mix every date / stage into one list; the HUD "Best" in Journey is the best across all stages, not the current stage.
 - Achievements never leave the device.
@@ -259,7 +259,7 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 ## Design intent not yet implemented
 
 - Localization for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT with a string table and language selection from the platform locale.
-- Fetching and showing the server-validated leaderboards (global and friends-filtered) on the Score Chase, Daily and Challenge screens, with the player's platform display name on submissions.
-- Delivering achievements and cloud-saving the progress document through the platform.
+- Fetching and showing the own-server validated leaderboards (global and friends-filtered) on the Score Chase, Daily and Challenge screens, beyond the platform board.
+- Delivering achievements through the platform.
 - Per-stage HUD best in Journey and per-date daily boards.
 - Suppressing particle bursts under reduced motion.

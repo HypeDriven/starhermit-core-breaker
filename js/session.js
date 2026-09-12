@@ -53,9 +53,30 @@
   }
 
   function save() {
+    var wrapped = null;
     try {
-      localStorage.setItem(DOC_KEY, JSON.stringify({ v: DOC_VERSION, data: doc, sum: checksum(doc) }));
+      wrapped = JSON.stringify({ v: DOC_VERSION, data: doc, sum: checksum(doc) });
+      localStorage.setItem(DOC_KEY, wrapped);
     } catch (e) {}
+    if (window.CBPlatform && typeof window.CBPlatform.onLocalSave === 'function' && wrapped)
+      window.CBPlatform.onLocalSave(wrapped); // host adapter mirrors to the cloud slot
+  }
+
+  // Validates a wrapped doc string ({v, data, sum}) and, when it matches the
+  // current version and checksum, adopts it as the live doc (remote-preferred
+  // cloud load goes through here). Returns true when adopted.
+  function importWrapped(wrapped) {
+    try {
+      var wrap = JSON.parse(wrapped);
+      if (!wrap || wrap.v !== DOC_VERSION) return false;
+      if (checksum(wrap.data) !== wrap.sum) return false;
+      var d = wrap.data;
+      for (var k in doc) if (d[k] === undefined) d[k] = doc[k];
+      for (var s in DEFAULT_SETTINGS) if (d.settings[s] === undefined) d.settings[s] = DEFAULT_SETTINGS[s];
+      doc = d;
+      save(); // local cache mirrors the remote doc
+      return true;
+    } catch (e) { return false; }
   }
 
   load();
@@ -137,6 +158,7 @@
     isTutorialDone: isTutorialDone, markTutorialDone: markTutorialDone,
     hasAchievement: hasAchievement, unlockAchievement: unlockAchievement,
     addTotals: addTotals, getTotals: getTotals,
-    saveReplay: saveReplay, getReplay: getReplay
+    saveReplay: saveReplay, getReplay: getReplay,
+    importWrapped: importWrapped
   };
 })();

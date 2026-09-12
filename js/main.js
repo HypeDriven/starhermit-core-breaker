@@ -312,12 +312,32 @@
     var board = $('score-board');
     board.innerHTML = '';
     var local = JSON.parse(localStorage.getItem('corebreaker.scoreboard.v1') || '[]');
+    var P = window.CBPlatform;
+    if (P && P.hosted) {
+      // Platform leaderboard (read-only): nicknames resolved, own row marked.
+      P.fetchLeaderboard().then(function (entries) {
+        if (!entries || !entries.length) return;
+        var h = document.createElement('li');
+        h.textContent = '— platform board —';
+        h.className = 'small';
+        board.appendChild(h);
+        entries.slice(0, 10).forEach(function (e, i) {
+          var li = document.createElement('li');
+          li.textContent = '#' + (i + 1) + ' ' + fmtScore(e.score) + ' — ' + e.name;
+          board.appendChild(li);
+        });
+        var sep = document.createElement('li');
+        sep.textContent = '— this device —';
+        sep.className = 'small';
+        board.appendChild(sep);
+      }).catch(function () {});
+    }
     local.slice(0, 10).forEach(function (row) {
       var li = document.createElement('li');
       li.textContent = fmtScore(row.score) + ' — depth ' + row.depth + ' (' + new Date(row.atMs).toLocaleDateString() + ')';
       board.appendChild(li);
     });
-    if (!local.length) {
+    if (!local.length && !(P && P.hosted)) {
       var li = document.createElement('li');
       li.textContent = 'No dives yet. Yours will appear here; hosted boards compare with friends.';
       board.appendChild(li);
@@ -802,11 +822,14 @@
     // lessons are not scored, and practice shafts use a throwaway random seed:
     // neither belongs on a shared board
     if (playKind === 'tutorial' || playKind === 'practice') return;
+    var P = window.CBPlatform;
+    var hostedName = P && P.hosted && P.profile ? P.profile.name : null;
     fetch('/api/v1/score', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: P ? P.headers({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        board: bestKey(), name: 'local pilot',
+        board: bestKey(), name: hostedName || 'local pilot',
+        playerId: P && P.hosted ? P.userId : undefined,
         contentVersion: replay.contentVersion, seed: replay.seed,
         cfg: replay.cfg, log: replay.log, hash: replay.hash,
         score: replay.score, durationMs: s.elapsedMs,
@@ -821,7 +844,7 @@
   function syncServerTime() {
     if (!window.fetch || location.protocol === 'file:') return;
     var t0 = Date.now();
-    fetch('/api/v1/time').then(function (r) { return r.json(); }).then(function (res) {
+    fetch('/api/v1/time', { headers: window.CBPlatform ? window.CBPlatform.headers() : {} }).then(function (r) { return r.json(); }).then(function (res) {
       var t1 = Date.now();
       if (res && typeof res.now === 'number') {
         serverOffsetMs = res.now - Math.round((t0 + t1) / 2);
@@ -966,7 +989,38 @@
 
   // ---------- boot ----------
 
+  // Account + cloud-sync status line on the title screen. Offline keeps the
+  // identical local-only behaviour; hosted shows the account nickname.
+  function renderAccountLine() {
+    var el = $('account-line'), P = window.CBPlatform;
+    if (!el || !P) return;
+    if (!P.hosted) {
+      el.textContent = 'Offline — progress is stored on this device.';
+      return;
+    }
+    var name = P.profile ? P.profile.name : '…';
+    var syncTxt = P.sync === 'synced' ? 'progress synced'
+      : P.sync === 'saving' ? 'saving…'
+      : 'cloud sync unavailable';
+    el.textContent = 'Playing as ' + name + ' · ' + syncTxt;
+  }
+
   function boot() {
+    // Platform handshake: token read (fragment), remote save wins, refresh.
+    try { window.CBPlatform.init(); } catch (e) { /* offline */ }
+    if (window.CBPlatform.hosted) {
+      try { window.CBPlatform.onSync(renderAccountLine); } catch (e) { /* ok */ }
+      window.CBPlatform.fetchProfile().then(renderAccountLine).catch(function () {});
+      window.CBPlatform.loadCloud().then(function (remoteRaw) {
+        if (remoteRaw && Session.importWrapped(remoteRaw)) {
+          applySettings();
+          renderTitleProgress();
+          renderPracticeList();
+          renderChallengeList();
+        }
+        renderAccountLine();
+      }).catch(function () {});
+    }
     var ok = false;
     try { ok = Render.init($('game-canvas')); } catch (e) { ok = false; }
     if (!ok || !Render.isAvailable()) {
@@ -981,6 +1035,7 @@
     Audio.onCaption(caption);
     $('res-art').addEventListener('error', function () { $('res-art').classList.add('hidden'); });
     syncServerTime();
+    renderAccountLine();
     showScreen('screen-title', true);
     // idle render behind menus
     rafId = requestAnimationFrame(frameLoop);
