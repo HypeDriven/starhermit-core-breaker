@@ -10,7 +10,8 @@
 
   var DEFAULT_SETTINGS = {
     volMusic: 40, volSfx: 80, volAmbience: 35, muted: 0,
-    quality: 'auto',            // auto | low | medium | high
+    quality: 'auto',            // graphics preset: auto | low | balanced | high | ultra (legacy 'medium' = balanced)
+    gfx: {},                    // graphics overrides: render_scale, adaptive, show_fps, per-category tiers (js/gfx.js)
     reducedMotion: 0, highContrast: 0, largeText: 0, leftHanded: 0,
     holdToggle: 0,              // 0 = hold-to-dive, 1 = toggle
     timingAssist: 0,            // widens nothing in rules; shows stronger hints

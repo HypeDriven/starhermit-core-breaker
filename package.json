@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:e2e": "node tests/e2e.mjs",
-    "test": "node tests/run_tests.js"
+    "test": "node tests/run_tests.js && node --test tests/gfx.test.js"
   },
   "devDependencies": {
     "playwright-core": "^1.62.1"

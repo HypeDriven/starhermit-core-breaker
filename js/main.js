@@ -10,7 +10,7 @@
   'use strict';
 
   var Rules = window.CBRules, Content = window.CBContent, Audio = window.CBAudio,
-      Render = window.CBRender, Session = window.CBSession, RNG = window.CBRNG;
+      Render = window.CBRender, Session = window.CBSession, RNG = window.CBRNG, Gfx = window.CBGfx;
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -121,7 +121,7 @@
 
   var SETTING_IDS = {
     'set-music': 'volMusic', 'set-sfx': 'volSfx', 'set-amb': 'volAmbience',
-    'set-mute': 'muted', 'set-captions': 'captions', 'set-quality': 'quality',
+    'set-mute': 'muted', 'set-captions': 'captions',
     'set-motion': 'reducedMotion', 'set-contrast': 'highContrast',
     'set-large-text': 'largeText', 'set-lefty': 'leftHanded',
     'set-toggle': 'holdToggle', 'set-assist': 'timingAssist', 'set-theme': 'theme'
@@ -133,6 +133,7 @@
       if (el.type === 'checkbox') el.checked = !!val;
       else el.value = val;
     }
+    loadGfxUI();
   }
 
   function applySettings() {
@@ -141,8 +142,7 @@
       Session.getSetting('volSfx') / 100,
       Session.getSetting('volAmbience') / 100);
     Audio.setMuted(!!Session.getSetting('muted'));
-    var q = Session.getSetting('quality');
-    Render.setQuality(q === 'auto' ? autoQuality() : q);
+    Render.setGraphics(savedGfx());
     Render.setReducedMotion(!!Session.getSetting('reducedMotion') ||
       (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches));
     Render.setHighContrast(!!Session.getSetting('highContrast'));
@@ -151,10 +151,99 @@
     document.body.classList.toggle('left-handed', !!Session.getSetting('leftHanded'));
   }
 
-  function autoQuality() {
-    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    var small = Math.min(window.innerWidth, window.innerHeight) < 600;
-    return (coarse || small) ? 'medium' : 'high';
+  // ---------- graphics settings (quality model in js/gfx.js) ----------
+
+  var gfxStr = Gfx.strings(Gfx.pickLocale(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]));
+
+  // Saved graphics = the `quality` preset plus the `gfx` overrides object in the settings doc.
+  function savedGfx() {
+    var o = {}, g = Session.getSetting('gfx') || {};
+    for (var k in g) o[k] = g[k];
+    o.preset = Gfx.normalizePreset(Session.getSetting('quality'));
+    return o;
+  }
+  function storeGfx(o) {
+    var g = {};
+    for (var k in o) if (k !== 'preset') g[k] = o[k];
+    Session.setSetting('quality', o.preset || 'auto');
+    Session.setSetting('gfx', g);
+    Render.setGraphics(savedGfx());
+    loadGfxUI();
+    setTimeout(refreshGfxSummary, 250); // post chain rebuilds on the next frame
+  }
+
+  function buildGfxUI() {
+    var host = $('gfx-cats');
+    Gfx.CATEGORY_ORDER.forEach(function (cat) {
+      var row = document.createElement('div');
+      row.className = 'settings-row';
+      var label = document.createElement('label');
+      label.setAttribute('for', 'set-gfx-' + cat);
+      label.textContent = gfxStr.cats[cat];
+      var sel = document.createElement('select');
+      sel.id = 'set-gfx-' + cat;
+      sel.setAttribute('data-gfx-cat', cat);
+      sel.appendChild(new Option('', 'preset'));
+      Gfx.CATEGORIES[cat].forEach(function (t) { sel.appendChild(new Option(gfxStr.tiers[t] || t, t)); });
+      sel.addEventListener('change', function () {
+        var o = savedGfx();
+        if (sel.value === 'preset') delete o[cat]; else o[cat] = sel.value;
+        storeGfx(o);
+      });
+      row.appendChild(label); row.appendChild(sel);
+      host.appendChild(row);
+    });
+    var texts = document.querySelectorAll('[data-gfx-text]');
+    for (var i = 0; i < texts.length; i++) texts[i].textContent = gfxStr[texts[i].getAttribute('data-gfx-text')];
+    $('set-quality').addEventListener('change', function () {
+      storeGfx(Gfx.choosePreset(savedGfx(), $('set-quality').value)); // a preset clears overrides
+    });
+    $('set-gfx-scale').addEventListener('input', function () {
+      var o = savedGfx();
+      o.render_scale = Number($('set-gfx-scale').value) / 100;
+      $('gfx-scale-val').textContent = $('set-gfx-scale').value + '%';
+      storeGfx(o);
+    });
+    ['adaptive', 'show_fps'].forEach(function (key) {
+      var el = $(key === 'adaptive' ? 'set-gfx-adaptive' : 'set-gfx-fps');
+      el.addEventListener('change', function () { var o = savedGfx(); o[key] = el.checked; storeGfx(o); });
+    });
+  }
+
+  function loadGfxUI() {
+    var info = Render.graphicsInfo ? Render.graphicsInfo() : null;
+    var s = savedGfx(), detected = info ? info.detected : 'balanced';
+    var r = Gfx.resolve(s, detected);
+    var qs = $('set-quality');
+    for (var i = 0; i < qs.options.length; i++) {
+      var v = qs.options[i].value;
+      qs.options[i].textContent = v === 'auto'
+        ? Gfx.fmt(gfxStr.auto, { tier: gfxStr.presets[detected] }) : gfxStr.presets[v];
+    }
+    qs.value = s.preset;
+    var pct = Math.round(r.userScale * 100);
+    $('set-gfx-scale').value = pct;
+    $('gfx-scale-val').textContent = pct + '%';
+    Gfx.CATEGORY_ORDER.forEach(function (cat) {
+      var sel = $('set-gfx-' + cat);
+      var tier = Gfx.presetTier(r.preset, cat);
+      sel.options[0].textContent = Gfx.fmt(gfxStr.fromPreset, { tier: gfxStr.tiers[tier] || tier });
+      sel.value = Gfx.CATEGORIES[cat].indexOf(s[cat]) >= 0 ? s[cat] : 'preset';
+    });
+    $('set-gfx-adaptive').checked = r.adaptive;
+    $('set-gfx-fps').checked = r.showFps;
+    refreshGfxSummary();
+  }
+
+  function refreshGfxSummary() {
+    var info = Render.graphicsInfo ? Render.graphicsInfo() : null;
+    if (!info || !info.resolved) { $('gfx-summary').textContent = ''; return; }
+    $('gfx-summary').textContent = [info.gpu || gfxStr.unknownGpu,
+      Gfx.describe(info.resolved, info.pixels[0] ? info.pixels : null, gfxStr)].join(' · ');
+    $('gfx-summary').setAttribute('data-gfx-preset', info.resolved.preset);
+    var note = $('gfx-post-note');
+    note.textContent = gfxStr.postFailed;
+    note.classList.toggle('hidden', !(info.postFailed && info.resolved.post));
   }
 
   function bindSettings() {
@@ -1032,6 +1121,7 @@
     renderPracticeList();
     renderChallengeList();
     bindSettings();
+    buildGfxUI();
     Audio.onCaption(caption);
     $('res-art').addEventListener('error', function () { $('res-art').classList.add('hidden'); });
     syncServerTime();

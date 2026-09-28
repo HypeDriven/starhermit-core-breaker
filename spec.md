@@ -19,24 +19,26 @@
 
 | Path | Responsibility |
 |---|---|
-| `index.html` | DOM shell: canvas, live regions, HUD, action tray, six screens, five overlays, script tags |
+| `index.html` | DOM shell: canvas, live regions, HUD, action tray, six screens, five overlays, import map, script tags |
 | `css/style.css` | Palette tokens, layout, safe-area padding, HUD/tray, overlays, responsive and reduced-motion rules |
 | `js/rng.js` | `CBRNG`: mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / av) |
 | `js/rules.js` | `CBRules`: `createGame`, `applyCommand`, `peek`, `hint`, `legalActions`, scoring, hashing, serialization |
 | `js/content.js` | `CBContent`: 5 themes, 40 journey stages, 6 challenges, 3 practice presets, endless ruleset, `dailyConfig`, 5 lessons, 9 achievements |
 | `js/session.js` | `CBSession`: versioned, checksummed `localStorage` progress document and settings |
 | `js/audio.js` | `CBAudio`: WebAudio buses, Opus one-shots with synth fallback, ambience hum, adaptive pulse music, captions |
-| `js/render.js` | `CBRender`: Three.js scene, windowed segment mesh pool, striker, charge pips, particles, camera drift/shake |
+| `js/gfx.js` | `CBGfx` (UMD, pure): graphics presets, per-category overrides, GPU detection, `resolve`/`presetTier`/`describe`, Graphics-panel strings in nine locales |
+| `js/render.js` | `CBRender`: Three.js scene, windowed segment mesh pool, striker, charge pips, particles, shaft surround, camera drift/shake, graphics settings, post-processing chain, adaptive resolution |
 | `js/main.js` | UI shell: screens, overlays, settings, input, play lifecycle, HUD, results, achievements, server calls |
 | `server.js` | Static server plus authoritative `/api/v1` script: time, daily metadata, leaderboard, replay-validated score submit |
 | `starhermit.txt` | Platform manifest (`name`, `launch`, `owner`, `server=server.js`, `version`, `contentVersion`, `cover`) |
 | `sfx/` | 16 Opus clips, `manifest.txt` (canonical binding list), `manifest.json` (generator input), `manifest.md` |
 | `assets/` | `key-art.webp` (title backdrop), `core-reached.webp` / `dive-over.webp` (results illustrations) |
 | `coverart.png`, `icon.png`, `favicon.svg` | Store cover (1200×675), 256 px icon, SVG favicon |
-| `tests/run_tests.js`, `tests/e2e.mjs` | `npm test` rules/content/server suite; Playwright playthrough at desktop and mobile viewports |
+| `tests/run_tests.js`, `tests/gfx.test.js`, `tests/e2e.mjs` | `npm test` rules/content/server suite plus the `node --test` graphics-model suite; Playwright playthrough at desktop and mobile viewports |
 | `tests/browser_smoke.js` | Legacy CDP smoke script (not part of `npm test`) |
 | `tools/` | Dev-only; `scores.json` is written here by the server at runtime |
-| `vendor/three.module.min.js` | Three.js (MIT) |
+| `vendor/three.module.min.js` | Three.js r160 (MIT), mapped as `three` by the page's import map |
+| `vendor/three/addons/` | Same-revision (0.160.1) three.js addons, mapped as `three/addons/`: EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass, FXAAShader, RoomEnvironment, RoundedBoxGeometry and their shader/math dependencies; exposed as `window.CBThreeAddons` |
 | `LICENSE.md` | PolyForm Noncommercial 1.0.0 |
 
 ## 2. Vision and design pillars
@@ -137,7 +139,9 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 
 ## 8. Art direction
 
-**Hero.** The rotating ring of segments at the striker's height, lit by one warm key light and a violet hemisphere fill; camera at (0, 4.6, 9.2) looking at (0, −1.2, 0), drifting down up to 1.2 units with depth.
+**Hero.** The rotating ring of segments at the striker's height, lit by a theme-tinted key light, a hemisphere fill, an accent rim light from behind, a point light at the striker's centre (brighter while holding) and a warm point light over the golden core; camera at (0, 4.6, 9.2) looking at (0, −1.2, 0), drifting down up to 1.2 units with depth. The core, and a faint energy beam rising from it to just under the striker, travel with the shaft.
+
+**Graphics.** ACES filmic tone mapping with sRGB output. Optional effects: key-light PCF soft shadows (a shadow box fitted to the rendered window of the ring, 3 layers above to 12 below, projected into light space); image-based lighting from a `RoomEnvironment` PMREM as `scene.environment` (crystal and armor reflections); detailed surfaces (bevelled `RoundedBoxGeometry` segments; crystal is a clear-coated `MeshPhysicalMaterial` with a procedural facet-noise map and glowing fracture veins as its emissive map; armor is brushed clear-coated metal with panel seams, rivets and a glowing warning-chevron band along its lower edge; plain surfaces fall back to boxes with `MeshStandardMaterial`, armor flat-shaded); GTAO contact darkening; bloom limited to emissive highlights (threshold 0.9: striker, core, charged pips, shard bursts, crystal veins, chevrons); a colour grade (gentle S-curve, +12 % saturation, cool shadows / warm highlights) with vignette; FXAA, SMAA or MSAA; shard particle bursts (additive octahedra, HDR-bright so they bloom, count scaled by tier); and an animated shaft surround (a gridded cylindrical wall that scrolls with descent, rising dust motes, a pulsing core and beam). Reduced motion (setting or media query) freezes the motes, beam pulse and core pulse; the wall still follows descent. Settings → **Graphics** offers: Quality (Auto (detected: <tier>) — chosen from the WebGL unmasked renderer string, software renderers get Low, discrete GPUs / Apple M get High, others Balanced, and touch / mobile devices are capped at Balanced; Low; Balanced; High; Ultra); Render scale 50–200 % (multiplies the preset's scale); one select per category — Shadows (off / low 1024² / medium 2048² / high 4096²), Ambient occlusion (off / on / high), Bloom, Colour grade, Anti-aliasing (off / FXAA / SMAA / MSAA), Reflections, Surface detail (plain / detailed), Particles (low ⅓ / medium ⅔ / high), Shaft background (static / animated) — each defaulting to "From preset (<tier>)"; Adaptive resolution (on by default: every 90 frames, an average over 26 ms steps the scale down 0.1 to a floor of 0.6, under 14 ms steps it back up 0.05); Show frame rate (a `#fps-meter` readout, bottom-left); a summary line "GPU · cost summary · W×H px"; and a note when post-processing cannot be built (the game then renders directly, silently). Choosing a preset clears the category overrides. Changes apply live (shadow maps, post chain rebuild, pixel ratio, surfaces, surround) and persist in the progress doc (`quality` = preset, `gfx` = overrides; legacy `medium` reads as Balanced). Pixel ratio = min(devicePixelRatio, preset cap: Low 1 / Balanced 1.5 / High and Ultra 2) × preset scale (Ultra 1.25) × render scale × adaptive scale. The composer (RenderPass → GTAO → UnrealBloom → grade → OutputPass → SMAA/FXAA on a half-float target, 4× MSAA samples when MSAA is chosen) runs only when a post effect is on; Low renders straight to the MSAA canvas. The active preset is mirrored as `data-gfx-preset` on `<body>` and the canvas. Presets: Low = no shadows/AO/bloom/grade/reflections, MSAA, plain, particles low, static surround; Balanced = low shadows, bloom, grade, FXAA, reflections, detailed, particles medium, animated; High = medium shadows, AO, bloom, grade, SMAA, reflections, detailed, particles high, animated; Ultra = high shadows, high AO, MSAA, scale 1.25, otherwise as High.
 
 **DOM palette (`css/style.css`).** Background `#0b0918`; panel `rgba(20,17,38,.92)` with border `#4a3f8f`; text `#f2eefc`; dim `#b8b0d8`; accent `#9be8ff` (title, focus ring, hint text); gold `#ffd166` (charge pips, toast, stars); danger `#ff6b7a`; buttons `#241f45` → hover `#322a5e`; primary `#2d6a8f` → hover `#3a86b0`. High contrast swaps to black panels, white borders/text, `#00e5ff`, `#ffe600`, `#ff4757`.
 
@@ -149,11 +153,11 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 - Solar Forge: bg `#241c10`, safe `#ffd98a`, armor `#6a5a8a`, core `#ffffff`
 High-contrast variants (`safeHC`/`armorHC`) are saturated Open-Color hues so safe vs armor never relies on brightness alone; armor is additionally flat-shaded and more metallic (`makeSegMesh`).
 
-**Shape language.** Chunky 2.6×0.5×1.1 boxes for segments, a 0.62-radius icosahedron striker with emissive glow, a golden cylinder core under the last layer, small spheres for charge pips orbiting above the striker. Segments already broken are hidden rather than animated away.
+**Shape language.** Chunky 2.6×0.5×1.1 segments (bevelled when detailed), a 0.62-radius flat-shaded icosahedron striker with emissive glow, a golden cylinder core under the last layer, small octahedral charge pips orbiting above the striker (glowing when charged). Segments already broken are hidden rather than animated away.
 
 **Typography.** System sans (`Segoe UI`, system-ui, Arial). Title `clamp(34px, 7vw, 60px)` with 0.06 em tracking and a cyan glow; HUD labels 11 px uppercase, values 20–24 px tabular numerals.
 
-**Motion.** Shaft rotation and descent come straight from the rules snapshot; striker spin and emissive follow with a damped lerp; particle bursts (pool of 140, count scaled by quality) on break/overdrive/crash/win; tiered camera shake 0.06–0.22. With reduced motion (setting or media query): no striker spin, no camera drift, no shake, no toast fade; particles still play.
+**Motion.** Shaft rotation and descent come straight from the rules snapshot; striker spin and emissive follow with a damped lerp (the striker idles slowly behind menus); spinning shard bursts (pool of 140, count scaled by the Particles tier) on break/overdrive/crash/win; tiered camera shake 0.06–0.22; with an animated surround, motes rise and the core and beam pulse. With reduced motion (setting or media query): no striker spin, no camera drift, no shake, no mote/pulse animation, no toast fade; particles still play.
 
 **Visual assets the design calls for.** Title backdrop key art (shipped), results illustration for win and loss (shipped), store cover (shipped), icon and favicon (shipped). The striker and segments stay procedural on purpose; no GLTF model is used.
 
@@ -184,7 +188,7 @@ High-contrast variants (`safeHC`/`armorHC`) are saturated Open-Color hues so saf
 
 ## 10. Localization
 
-Shipped language: **English (en-US)** only. Strings live as literals in `index.html` (static labels) and `js/main.js` (dynamic HUD, results, hints, help, announcements) and `js/content.js` (stage names, intros, lesson text, achievement names). There is no language selector and no locale detection; `toLocaleString('en-US')` formats scores and `toLocaleDateString()` formats board dates. Layout allowances that already exist for longer strings: buttons wrap in `.menu-row`, cards scroll, HUD stats wrap onto a second row. See "Design intent not yet implemented" for the required nine-locale set.
+Shipped language: **English (en-US)** only, except the Settings → Graphics section, whose strings (`js/gfx.js STRINGS`) exist in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT and follow `navigator.languages` (language fallbacks: es → es-419, fr → fr-FR, pt → pt-BR, else en-US). Other strings live as literals in `index.html` (static labels) and `js/main.js` (dynamic HUD, results, hints, help, announcements) and `js/content.js` (stage names, intros, lesson text, achievement names). There is no language selector and no locale detection; `toLocaleString('en-US')` formats scores and `toLocaleDateString()` formats board dates. Layout allowances that already exist for longer strings: buttons wrap in `.menu-row`, cards scroll, HUD stats wrap onto a second row. See "Design intent not yet implemented" for the required nine-locale set.
 
 ## 11. Accessibility
 
@@ -218,7 +222,7 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 - **Loop.** `setInterval(1000/60)` issues `{type:'wait', atTick: tick+1}` per tick (`tickStep`); `requestAnimationFrame` draws the latest snapshot (`frameLoop`). Input commands are applied at the current tick, so the log is exact and replayable.
 - **Replay envelope.** `{v:1, contentVersion, cfg, seed, log, hash, score, atMs}` saved as `lastReplay` and POSTed to the server (except Learn and Practice). The results screen prints hash, seed and command count, then appends "server validated (rank n)" or the server's error.
 - **Persistence.** `localStorage` key `corebreaker.progress.v1` = `{v, data, sum}` with FNV-1a checksum; unknown version or bad checksum starts clean. Fields: journey stars/best, bests per board, dailies, tutorialDone, achievements, totals, settings, lastReplay. Score Chase keeps a separate `corebreaker.scoreboard.v1` list.
-- **Rendering budget.** Windowed mesh pool: 3 layers above and 12 below the striker, at most 15 × sectors segment meshes (≤ 150 at 10 sectors) plus 140 pooled particle spheres; quality tiers cap DPR at 1 / 1.5 / 2, enable shadows only on high, and cut particle counts to 1/3 and 2/3 on low/medium. `auto` picks medium on coarse pointers or viewports under 600 px.
+- **Rendering budget.** Windowed mesh pool: 3 layers above and 12 below the striker, at most 15 × sectors segment meshes (≤ 150 at 10 sectors) sharing two materials per surface detail level, plus 140 pooled particle shards, one surround wall, one beam and one 160-point mote cloud; graphics presets and overrides as in §8 **Graphics**. Light counts never change at runtime (the core light is dimmed, not hidden) so no shader recompiles happen mid-round.
 - **Server hardening.** 256 KB body cap, 20 000 command cap, 15-minute simulated-time cap, config bounds (`CFG_LIMITS`), path traversal and `.git`/`node_modules` refusal.
 - **E2E driving.** `tests/e2e.mjs` starts `server.js` on an ephemeral port with `CB_SCORES_FILE` redirected, launches system Chrome with SwiftShader, and plays through the visible UI only: clicks real buttons, holds Space (desktop) or the on-screen HOLD button (mobile, `hasTouch`), reads the hint pill text to decide when to release, and checks localStorage progress.
 
@@ -226,7 +230,9 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 
 `npm test` (`tests/run_tests.js`, 29 tests): config validation; hold descends and breaks; momentum growth; win bonuses; armor crash; overdrive; gap pass; release resets and decays; invalid-action reasons; time limit; resign; undo restore; peek/hint; serialization and version rejection; same seed + commands → same hash; different seeds differ; malformed-command fuzz; endless ramp without soft locks; all shipped configs legal and passable; daily immutability; lessons completable; achievement key format; golden greedy-policy wins for easy/mid/hard and every journey stage; interrupted/resumed replay equality; server accepts genuine and rejects forged replays; server ranking.
 
-`tests/e2e.mjs` (desktop 1280×800 keyboard, mobile 390×844 touch): title loads without the WebGL compat note; settings apply high contrast/reduced motion/high quality; help shows ≥ 3 cards; Learn opens lesson 1; journey grid has 40 stages with 1 unlocked; stage 1 is won with a 7-row breakdown and "server validated"; stars persist; stage 2 undo rewinds depth exactly, pause → settings → resume → win; Practice Calm reaches results by hint-driven dodging; Daily and Score screens render; hold button ≥ 44 px; zero console/page errors.
+`tests/gfx.test.js` (`node --test`, part of `npm test`): `detectPreset` on sample GPU strings, mobile cap, `resolve` with preset / override / invalid tier / scale clamp, preset choice clears overrides, `presetTier`/`describe`, every locale has every string, locale picking.
+
+`tests/e2e.mjs` (desktop 1280×800 keyboard, mobile 390×844 touch): title loads without the WebGL compat note; settings apply high contrast/reduced motion/Balanced quality; Graphics: Auto label shows the detected tier, Low then High change `data-gfx-preset` and the summary, a Bloom override and Show frame rate apply, all three survive a reload, choosing Low clears the override; help shows ≥ 3 cards; Learn opens lesson 1; journey grid has 40 stages with 1 unlocked; stage 1 is won with a 7-row breakdown and "server validated"; stars persist; stage 2 undo rewinds depth exactly, pause → settings → resume → win; Practice Calm reaches results by hint-driven dodging; Daily and Score screens render; hold button ≥ 44 px; zero console errors/warnings and page errors.
 
 **QA bar as checkable statements.** A new player sees instructions (lesson text, hint pill, stage intros) before needing them. Every feature in the UI is reachable in the browser by click/tap and by keyboard. No console errors or warnings during the playthrough. Text and controls are visible and not cut off at 1280×800 and 390×844 in both orientations. The game stays playable when the server, audio or an image is unavailable.
 

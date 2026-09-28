@@ -36,7 +36,7 @@ const SHOT = (stage, tag) => `/tmp/core-breaker-e2e-${stage}-${tag}.png`;
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome',
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 
 async function runPass(tag, contextOpts, inputMode) {
@@ -57,7 +57,7 @@ async function runPass(tag, contextOpts, inputMode) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !browserNoise.test(m.text())) errors.push(`console: ${m.text()}`);
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });
 
   const step = async (name, fn) => {
@@ -113,9 +113,50 @@ async function runPass(tag, contextOpts, inputMode) {
       await visible('#overlay-settings');
       await page.check('#set-contrast');
       await page.check('#set-motion');
-      await page.selectOption('#set-quality', 'high');
+      await page.selectOption('#set-quality', 'balanced');
       await page.waitForFunction(() => document.body.classList.contains('high-contrast'));
       await page.screenshot({ path: SHOT('settings', tag) });
+      await click('#btn-settings-close');
+      await page.waitForSelector('#overlay-settings', { state: 'hidden' });
+    });
+
+    await step('graphics: presets, override, persistence across reload', async () => {
+      const presetIs = (p) => page.waitForFunction((p) =>
+        document.body.dataset.gfxPreset === p && document.getElementById('game-canvas').dataset.gfxPreset === p, p);
+      const summaryHas = (re) => page.waitForFunction((src) =>
+        new RegExp(src).test(document.getElementById('gfx-summary').textContent), re.source);
+      await click('#btn-settings');
+      await visible('#overlay-settings');
+      await page.locator('#gfx-section').scrollIntoViewIfNeeded();
+      const auto = await page.locator('#set-quality option[value="auto"]').textContent();
+      if (!/Auto \(detected: \w+\)/.test(auto)) throw new Error('auto label: ' + auto);
+      await page.selectOption('#set-quality', 'low');
+      await presetIs('low');
+      await summaryHas(/no shadows/);
+      await page.selectOption('#set-quality', 'high');
+      await presetIs('high');
+      await summaryHas(/2048² shadows/);
+      const fromPreset = await page.locator('#set-gfx-bloom option[value="preset"]').textContent();
+      if (fromPreset !== 'From preset (On)') throw new Error('preset label: ' + fromPreset);
+      await page.selectOption('#set-gfx-bloom', 'off');
+      await page.check('#set-gfx-fps');
+      await visible('#fps-meter');
+      await summaryHas(/SMAA/);
+      if (/bloom/.test(await page.textContent('#gfx-summary'))) throw new Error('bloom override not applied');
+      await page.screenshot({ path: SHOT('graphics', tag) });
+      await page.reload({ waitUntil: 'load' });
+      await visible('#screen-title');
+      await presetIs('high');
+      await click('#btn-settings');
+      await visible('#overlay-settings');
+      if (await page.inputValue('#set-quality') !== 'high') throw new Error('preset not persisted');
+      if (await page.inputValue('#set-gfx-bloom') !== 'off') throw new Error('override not persisted');
+      if (!(await page.isChecked('#set-gfx-fps'))) throw new Error('fps toggle not persisted');
+      // choosing a preset clears overrides; back to Low keeps the rest of the run fast
+      await page.selectOption('#set-quality', 'low');
+      await presetIs('low');
+      if (await page.inputValue('#set-gfx-bloom') !== 'preset') throw new Error('preset did not clear overrides');
+      await page.uncheck('#set-gfx-fps');
       await click('#btn-settings-close');
       await page.waitForSelector('#overlay-settings', { state: 'hidden' });
     });

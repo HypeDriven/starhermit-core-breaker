@@ -173,10 +173,19 @@
       <div class="settings-row"><label for="set-amb">Ambience</label><input id="set-amb" type="range" min="0" max="100" /></div>
       <div class="settings-row"><label for="set-mute">Mute all</label><input id="set-mute" type="checkbox" /></div>
       <div class="settings-row"><label for="set-captions">Sound captions</label><input id="set-captions" type="checkbox" /></div>
-      <h3>Graphics</h3>
-      <div class="settings-row"><label for="set-quality">Quality tier</label>
-        <select id="set-quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      <section id="gfx-section" aria-labelledby="gfx-h">
+      <h3 id="gfx-h" data-gfx-text="heading">Graphics</h3>
+      <div class="settings-row"><label for="set-quality" data-gfx-text="quality">Quality</label>
+        <select id="set-quality" data-gfx="preset"><option value="auto">Auto</option><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
+      <div class="settings-row"><label for="set-gfx-scale" data-gfx-text="scale">Render scale</label>
+        <span class="range-wrap"><input id="set-gfx-scale" data-gfx="render_scale" type="range" min="50" max="200" step="5" value="100" /><output id="gfx-scale-val" for="set-gfx-scale">100%</output></span></div>
+      <div id="gfx-cats"></div>
+      <div class="settings-row"><label for="set-gfx-adaptive" data-gfx-text="adaptive">Adaptive resolution</label><input id="set-gfx-adaptive" data-gfx="adaptive" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-gfx-fps" data-gfx-text="showFps">Show frame rate</label><input id="set-gfx-fps" data-gfx="show_fps" type="checkbox" /></div>
+      <p id="gfx-summary" class="small gfx-summary" aria-live="polite"></p>
+      <p id="gfx-post-note" class="small gfx-note hidden" role="note"></p>
       <div class="settings-row"><label for="set-motion">Reduced motion</label><input id="set-motion" type="checkbox" /></div>
+      </section>
       <h3>Accessibility &amp; controls</h3>
       <div class="settings-row"><label for="set-contrast">High contrast</label><input id="set-contrast" type="checkbox" /></div>
       <div class="settings-row"><label for="set-large-text">Larger text</label><input id="set-large-text" type="checkbox" /></div>
@@ -207,9 +216,27 @@
   <div id="toast" class="hidden" role="status"></div>
 </div>
 
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
 <script type="module">
-  import * as THREE from './vendor/three.module.min.js';
+  import * as THREE from 'three';
   window.THREE = THREE;
+</script>
+<!-- post-processing / environment addons from the same three.js revision (r160); optional -->
+<script type="module">
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+  import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+  import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+  import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+  import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+  window.CBThreeAddons = { EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass,
+    FXAAShader, RoomEnvironment, RoundedBoxGeometry };
 </script>
 <script defer src="./js/rng.js"></script>
 <script defer src="./js/content.js"></script>
@@ -217,6 +244,7 @@
 <script defer src="./js/session.js"></script>
 <script defer src="./js/platform.js"></script>
 <script defer src="./js/audio.js"></script>
+<script defer src="./js/gfx.js"></script>
 <script defer src="./js/render.js"></script>
 <script defer src="./js/main.js"></script>
 <noscript><p style="padding:1em;font-size:18px">JavaScript is required to play Core Breaker.</p></noscript>
