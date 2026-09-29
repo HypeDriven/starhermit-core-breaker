@@ -1,4 +1,5 @@
 name=Core Breaker
+description=Smash through a rotating crystal tower, releasing before armored plates strike to reach the golden core.
 launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=server.js
