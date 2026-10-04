@@ -3,14 +3,16 @@
  *
  * Drives the REAL visible UI in headless Chrome (playwright-core + system
  * Chrome): title → settings/help → journey grid → stage 1 win via held
- * Space / held HOLD button → results with server-validated score →
+ * Space / held HOLD button → results (score kept locally) →
  * next stage with pause/settings/resume → practice round with hint-driven
  * hold/release dodging + undo → daily & score screens. Runs the whole flow
  * twice: desktop 1280×800 and a fresh mobile context 390×844 (hasTouch).
  *
  * The game is fully offline-capable; this test serves it with the repo's
- * own server.js (static files + /api/v1 score API) on an ephemeral port,
- * with the score store redirected to a temp file (CB_SCORES_FILE).
+ * own server.js as a static host on an ephemeral port (score store
+ * redirected to a temp file, CB_SCORES_FILE). Standalone passes fail on any
+ * same-origin /api or /ws request; the signed-in pass allows only the
+ * StarHermit platform routes and GET /api/v1/time.
  *
  * Synchronization reads only what a player sees (HUD/hintbar DOM) plus
  * localStorage progress; every action goes through real UI interaction.
@@ -39,6 +41,72 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 
+// StarHermit platform routes (the game's own GET /api/v1/time is separate).
+const PLATFORM_API = /^\/api\/v1\/(games|users|me|leaderboards|chat)\//;
+
+// Signed-in pass: launch token in the fragment, platform API stubbed.
+async function platformPass(tag, contextOpts) {
+  const context = await browser.newContext(contextOpts);
+  const page = await context.newPage();
+  const errors = [], seen = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.origin === new URL(BASE).origin && /^\/(api|ws)(\/|$)/.test(u.pathname) &&
+        !PLATFORM_API.test(u.pathname) && u.pathname !== '/api/v1/time') errors.push(`own-server request: ${u.pathname}`);
+  });
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = `${b64u({ alg: 'none' })}.${b64u({ sub: 'u-e2e-0001', game_scope: 'core-breaker', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
+  await page.route((url) => PLATFORM_API.test(url.pathname), (route) => {
+    const req = route.request(), u = new URL(req.url());
+    seen.push(req.method() + ' ' + u.pathname);
+    const json = (o) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+    if (u.pathname.endsWith('/profile')) return json({ nickname: 'Pip Tester' });
+    if (u.pathname.endsWith('/settings') && req.method() === 'GET') return json({ settings: { largeText: 1 } });
+    if (u.pathname.endsWith('/controls')) return json({ actions: [{ action: 'undo', codes: ['KeyZ'] }] });
+    if (u.pathname.endsWith('/leaderboards')) return json([{ id: 'lb1', key: 'score' }]);
+    if (u.pathname.includes('/leaderboards/lb1/entries')) return json({ items: [{ userId: 'u-e2e-0001', score: 1234 }] });
+    return route.fulfill({ status: 204 });
+  });
+  const click = (sel) => (contextOpts.hasTouch ? page.tap(sel) : page.click(sel));
+  const step = async (name, fn) => { await fn(); console.log(`ok - [${tag}] ${name}`); };
+  try {
+    await step('signed in: nickname, save load, fragment stripped', async () => {
+      await page.goto(BASE + '#game_token=' + jwt, { waitUntil: 'load' });
+      await page.waitForFunction(() => /Pip Tester/.test(document.getElementById('account-line').textContent), null, { timeout: 8000 });
+      if (await page.evaluate(() => location.hash)) throw new Error('launch fragment not stripped');
+      if (await page.locator('#btn-signin:visible').count()) throw new Error('sign-in shown while signed in');
+      if (!seen.includes('GET /api/v1/me/cloud-saves/' + encodeURIComponent('game:core-breaker'))) throw new Error('no cloud load: ' + seen.join(', '));
+    });
+    await step('platform settings applied (larger text)', async () => {
+      await page.waitForFunction(() => document.body.classList.contains('large-text'), null, { timeout: 5000 });
+    });
+    await step('invite a friend shows a confirmation toast', async () => {
+      await page.locator('#btn-invite').scrollIntoViewIfNeeded();
+      await click('#btn-invite');
+      await page.waitForSelector('#toast:not(.hidden)', { timeout: 3000 });
+      await page.screenshot({ path: SHOT('platform', tag) });
+    });
+    await step('help lists the platform key binding', async () => {
+      await page.locator('#btn-help').scrollIntoViewIfNeeded();
+      await click('#btn-help');
+      await page.waitForFunction(() => /Z: undo/.test(document.getElementById('help-controls').textContent), null, { timeout: 3000 });
+    });
+    await step('score chase shows the platform board', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator('#btn-score').scrollIntoViewIfNeeded();
+      await click('#btn-score');
+      await page.waitForFunction(() => /You \(Pip Tester\)/.test(document.getElementById('score-board').textContent), null, { timeout: 5000 });
+    });
+    if (errors.length) throw new Error('page errors:\n' + errors.join('\n'));
+  } finally {
+    await context.close();
+  }
+}
+
 async function runPass(tag, contextOpts, inputMode) {
   const context = await browser.newContext(contextOpts);
   const page = await context.newPage();
@@ -55,6 +123,12 @@ async function runPass(tag, contextOpts, inputMode) {
         up: () => page.mouse.up(),
       };
   const errors = [];
+  // Standalone (no launch token): no same-origin /api or /ws request at all.
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.origin === new URL(BASE).origin && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`own-server request while standalone: ${u.pathname}`);
+  });
+  page.on('request', (r) => { if (PLATFORM_API.test(new URL(r.url()).pathname)) errors.push('standalone made a StarHermit call: ' + r.url()); });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
     if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
@@ -200,9 +274,6 @@ async function runPass(tag, contextOpts, inputMode) {
       console.log(`  headline: ${headline} (${rows} breakdown rows)`);
       if (headline !== 'Core Reached!') throw new Error('stage 1 not won: ' + headline);
       if (rows < 6) throw new Error(`expected win breakdown rows, got ${rows}`);
-      await page.waitForFunction(
-        () => /server validated/.test(document.getElementById('res-replay').textContent),
-        null, { timeout: 5000 });
       await page.screenshot({ path: SHOT('results', tag) });
     });
 
@@ -326,6 +397,8 @@ try {
   console.log('ok - desktop pass complete');
   await runPass('mobile', { viewport: { width: 390, height: 844 }, hasTouch: true }, 'touch');
   console.log('ok - mobile pass complete');
+  await platformPass('platform-desktop', { viewport: { width: 1280, height: 800 } });
+  await platformPass('platform-mobile', { viewport: { width: 390, height: 844 }, hasTouch: true });
   console.log('\nE2E PASS — core-breaker playable end-to-end on desktop and mobile, no page errors');
 } finally {
   await browser.close();

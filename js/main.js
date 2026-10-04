@@ -58,6 +58,32 @@
     captionTimer = setTimeout(function () { el.textContent = ''; }, 1400);
   }
 
+  var PT = {
+    'en-US': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
+    'en-GB': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
+    'es-419': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se pudo copiar. Enlace de invitación: {link}' },
+    'es-ES': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se ha podido copiar. Enlace de invitación: {link}' },
+    'de-DE': { offline: 'Offline – der Fortschritt wird auf diesem Gerät gespeichert.', playing: 'Du spielst als {name}', synced: 'Fortschritt synchronisiert', saving: 'wird gespeichert…', nosync: 'Cloud-Synchronisierung nicht verfügbar', signIn: 'Mit StarHermit anmelden', invite: 'Freund einladen', copied: 'Einladungslink in die Zwischenablage kopiert.', copyFail: 'Kopieren fehlgeschlagen – Einladungslink: {link}' },
+    'fr-FR': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation cloud indisponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
+    'fr-CA': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation infonuagique non disponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
+    'pt-BR': { offline: 'Offline — o progresso fica salvo neste dispositivo.', playing: 'Jogando como {name}', synced: 'progresso sincronizado', saving: 'salvando…', nosync: 'sincronização na nuvem indisponível', signIn: 'Entrar com StarHermit', invite: 'Convidar um amigo', copied: 'Link de convite copiado para a área de transferência.', copyFail: 'Não foi possível copiar — link de convite: {link}' },
+    'it-IT': { offline: 'Offline: i progressi sono salvati su questo dispositivo.', playing: 'Giochi come {name}', synced: 'progressi sincronizzati', saving: 'salvataggio…', nosync: 'sincronizzazione cloud non disponibile', signIn: 'Accedi con StarHermit', invite: 'Invita un amico', copied: 'Link di invito copiato negli appunti.', copyFail: 'Impossibile copiare. Link di invito: {link}' }
+  };
+  var P_STR = PT[Gfx.pickLocale(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language])] || PT['en-US'];
+
+  // ---------- key bindings (platform overrides via StarHermit controls) ----------
+  var DEFAULT_KEYS = { dive: ['Space'], toggle: ['Enter'], pause: ['KeyP'], undo: ['KeyU'], retry: ['KeyR'], back: ['Escape'] };
+  var bindings = DEFAULT_KEYS, keyAction = {};
+  function setBindings(b) {
+    bindings = b; keyAction = {};
+    Object.keys(b).forEach(function (a) { (b[a] || []).forEach(function (code) { keyAction[code] = a; }); });
+  }
+  setBindings(DEFAULT_KEYS);
+  function keyName(code) {
+    return String(code).replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow(.*)$/, '$1 arrow').replace(/^Escape$/, 'Escape');
+  }
+  function keysFor(action) { return (bindings[action] || []).map(keyName).join(' / '); }
+
   var toastTimer = null;
   function toast(msg) {
     var el = $('toast');
@@ -713,24 +739,27 @@
   var spaceHeld = false;
   document.addEventListener('keydown', function (e) {
     if (e.repeat) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var action = keyAction[e.code];
+    if (!action) return;
     var playing = playState && !$('hud').classList.contains('hidden');
-    if (e.key === ' ' || e.code === 'Space') {
+    if (action === 'dive') {
       if (!playing || anyOverlayOpen()) return;
       e.preventDefault();
-      spaceHeld = true;
+      spaceHeld = e.code;
       if (Session.getSetting('holdToggle')) {
         if (playState.holding) cmdRelease(); else cmdPress();
       } else cmdPress();
-    } else if (e.key === 'Enter' && playing && !anyOverlayOpen()) {
+    } else if (action === 'toggle' && playing && !anyOverlayOpen()) {
       e.preventDefault();
       if (playState.holding) cmdRelease(); else cmdPress();
-    } else if ((e.key === 'p' || e.key === 'P') && playing) {
+    } else if (action === 'pause' && playing) {
       if ($('overlay-pause').classList.contains('hidden')) pauseGame(); else resumeGame();
-    } else if ((e.key === 'u' || e.key === 'U') && playing) {
+    } else if (action === 'undo' && playing) {
       doUndo();
-    } else if ((e.key === 'r' || e.key === 'R') && playing && !$('overlay-results').classList.contains('hidden')) {
+    } else if (action === 'retry' && playing && !$('overlay-results').classList.contains('hidden')) {
       retry();
-    } else if (e.key === 'Escape') {
+    } else if (action === 'back') {
       if (!$('overlay-settings').classList.contains('hidden')) closeOverlay('overlay-settings');
       else if (!$('overlay-help').classList.contains('hidden')) closeOverlay('overlay-help');
       else if (!$('overlay-results').classList.contains('hidden')) { /* stay until choice */ }
@@ -740,7 +769,7 @@
     }
   });
   document.addEventListener('keyup', function (e) {
-    if ((e.key === ' ' || e.code === 'Space') && spaceHeld) {
+    if (spaceHeld && e.code === spaceHeld) {
       spaceHeld = false;
       if (!Session.getSetting('holdToggle')) cmdRelease();
     }
@@ -839,7 +868,6 @@
       hash: Rules.hashState(s), score: s.score.total, atMs: Date.now()
     };
     Session.saveReplay(replay);
-    submitToServer(replay, s);
 
     $('res-headline').textContent = won ? 'Core Reached!' : 'Dive Over';
     $('res-reason').textContent = playName + ' — ' + reasonText(t.reason) +
@@ -904,41 +932,18 @@
     } catch (e) {}
   }
 
-  // ---------- server (optional, same-origin; fully offline-capable) ----------
-
-  function submitToServer(replay, s) {
-    if (!window.fetch || location.protocol === 'file:') return;
-    // lessons are not scored, and practice shafts use a throwaway random seed:
-    // neither belongs on a shared board
-    if (playKind === 'tutorial' || playKind === 'practice') return;
-    var P = window.CBPlatform;
-    var hostedName = P && P.hosted && P.profile ? P.profile.name : null;
-    fetch('/api/v1/score', {
-      method: 'POST',
-      headers: P ? P.headers({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        board: bestKey(), name: hostedName || 'local pilot',
-        playerId: P && P.hosted ? P.userId : undefined,
-        contentVersion: replay.contentVersion, seed: replay.seed,
-        cfg: replay.cfg, log: replay.log, hash: replay.hash,
-        score: replay.score, durationMs: s.elapsedMs,
-        assists: { undo: !!playCfg.mechanics.undo, hint: !!playCfg.mechanics.hint }
-      })
-    }).then(function (r) { return r.json(); }).then(function (res) {
-      if (res && res.accepted) $('res-replay').textContent += ' · server validated (rank ' + res.rank + ')';
-      else if (res && res.error) $('res-replay').textContent += ' · server: ' + res.error;
-    }).catch(function () { /* offline: local result stands */ });
-  }
+  // ---------- server time (signed in only; standalone uses the local clock) ----------
 
   function syncServerTime() {
-    if (!window.fetch || location.protocol === 'file:') return;
+    var P = window.CBPlatform;
+    if (!window.fetch || !P || !P.hosted) return; // no own-server request without a launch token
     var t0 = Date.now();
-    fetch('/api/v1/time', { headers: window.CBPlatform ? window.CBPlatform.headers() : {} }).then(function (r) { return r.json(); }).then(function (res) {
+    fetch('/api/v1/time', { headers: P.headers() }).then(function (r) { return r.json(); }).then(function (res) {
       var t1 = Date.now();
       if (res && typeof res.now === 'number') {
         serverOffsetMs = res.now - Math.round((t0 + t1) / 2);
       }
-    }).catch(function () { /* offline: local clock */ });
+    }).catch(function () { /* keep the local clock */ });
   }
 
   // ---------- retry / next ----------
@@ -993,9 +998,9 @@
     }).join('');
     var ctrls = [
       'Mouse / touch: hold anywhere on the playfield (or the HOLD button) to dive; release to hover.',
-      'Space: hold to dive, release to hover' + (Session.getSetting('holdToggle') ? ' (toggle mode: tap)' : '') + '.',
-      'Enter: tap to toggle dive/hover.',
-      'P or Escape: pause / resume. U: undo (where allowed). R: retry from results.'
+      keysFor('dive') + ': hold to dive, release to hover' + (Session.getSetting('holdToggle') ? ' (toggle mode: tap)' : '') + '.',
+      keysFor('toggle') + ': tap to toggle dive/hover.',
+      keysFor('pause') + ' or ' + keysFor('back') + ': pause / resume. ' + keysFor('undo') + ': undo (where allowed). ' + keysFor('retry') + ': retry from results.'
     ];
     $('help-controls').innerHTML = ctrls.map(function (c) { return '<li>' + c + '</li>'; }).join('');
   }
@@ -1083,33 +1088,53 @@
   function renderAccountLine() {
     var el = $('account-line'), P = window.CBPlatform;
     if (!el || !P) return;
-    if (!P.hosted) {
-      el.textContent = 'Offline — progress is stored on this device.';
-      return;
-    }
+    $('btn-signin').classList.toggle('hidden', !P.canSignIn());
+    $('btn-invite').classList.toggle('hidden', !(P.hosted && P.inviteLink()));
+    $('platform-row').classList.toggle('hidden', !P.canSignIn() && !(P.hosted && P.inviteLink()));
+    if (!P.hosted) { el.textContent = P_STR.offline; return; }
     var name = P.profile ? P.profile.name : '…';
-    var syncTxt = P.sync === 'synced' ? 'progress synced'
-      : P.sync === 'saving' ? 'saving…'
-      : 'cloud sync unavailable';
-    el.textContent = 'Playing as ' + name + ' · ' + syncTxt;
+    var syncTxt = P.sync === 'synced' ? P_STR.synced : P.sync === 'saving' ? P_STR.saving : P_STR.nosync;
+    el.textContent = P_STR.playing.replace('{name}', name) + ' · ' + syncTxt;
+  }
+
+  function inviteFriend() {
+    var link = window.CBPlatform.inviteLink();
+    if (!link) return;
+    var done = function () { toast(P_STR.copied); }, fail = function () { toast(P_STR.copyFail.replace('{link}', link)); };
+    try { navigator.clipboard.writeText(link).then(done, fail); } catch (e) { fail(); }
+  }
+
+  // Signed-in boot work: profile, remote save (wins), settings KV, bindings.
+  function syncFromPlatform() {
+    var P = window.CBPlatform;
+    if (!P.hosted) return;
+    P.fetchProfile().then(renderAccountLine).catch(function () {});
+    P.loadCloud().then(function (remoteRaw) {
+      if (remoteRaw && Session.importWrapped(remoteRaw)) {
+        applySettings();
+        renderTitleProgress();
+        renderPracticeList();
+        renderChallengeList();
+      }
+      return P.getSettings();
+    }).then(function (remote) {
+      if (remote && Session.applyRemoteSettings(remote)) { applySettings(); loadSettingsUI(); }
+      renderAccountLine();
+    }).catch(function () {});
+    P.loadBindings(DEFAULT_KEYS).then(function (b) { setBindings(b); renderHelp(); }).catch(function () {});
   }
 
   function boot() {
-    // Platform handshake: token read (fragment), remote save wins, refresh.
-    try { window.CBPlatform.init(); } catch (e) { /* offline */ }
-    if (window.CBPlatform.hosted) {
-      try { window.CBPlatform.onSync(renderAccountLine); } catch (e) { /* ok */ }
-      window.CBPlatform.fetchProfile().then(renderAccountLine).catch(function () {});
-      window.CBPlatform.loadCloud().then(function (remoteRaw) {
-        if (remoteRaw && Session.importWrapped(remoteRaw)) {
-          applySettings();
-          renderTitleProgress();
-          renderPracticeList();
-          renderChallengeList();
-        }
-        renderAccountLine();
-      }).catch(function () {});
-    }
+    // Platform handshake: StarHermit.init() reads the launch token.
+    var P = window.CBPlatform;
+    try { P.init(); } catch (e) { /* offline */ }
+    P.onSync(renderAccountLine);
+    P.onAuth(function () { renderAccountLine(); syncFromPlatform(); });
+    $('btn-signin').textContent = P_STR.signIn;
+    $('btn-invite').textContent = P_STR.invite;
+    $('btn-signin').addEventListener('click', function () { Audio.sfxUi(); P.signIn(); });
+    $('btn-invite').addEventListener('click', function () { Audio.resume(); Audio.sfxUi(); inviteFriend(); });
+    syncFromPlatform();
     var ok = false;
     try { ok = Render.init($('game-canvas')); } catch (e) { ok = false; }
     if (!ok || !Render.isAvailable()) {

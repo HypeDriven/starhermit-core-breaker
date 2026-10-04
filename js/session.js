@@ -84,7 +84,21 @@
 
   // ---------- settings ----------
   function getSetting(key) { return doc.settings[key]; }
-  function setSetting(key, val) { doc.settings[key] = val; save(); }
+  function setSetting(key, val) {
+    doc.settings[key] = val; save();
+    var P = window.CBPlatform, o = {};
+    if (P && P.hosted && typeof P.patchSettings === 'function') { o[key] = val; P.patchSettings(o); } // settings KV mirror
+  }
+  // Platform settings KV → local doc (known keys only; platform value wins).
+  function applyRemoteSettings(obj) {
+    var changed = false;
+    for (var k in DEFAULT_SETTINGS) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] != null &&
+          typeof obj[k] === typeof DEFAULT_SETTINGS[k]) { doc.settings[k] = obj[k]; changed = true; }
+    }
+    if (changed) save();
+    return changed;
+  }
 
   // ---------- bests ----------
   function getBest(kind) { var b = doc.bests[kind]; return b ? b.score : null; }
@@ -152,7 +166,7 @@
   function getReplay() { return doc.lastReplay; }
 
   window.CBSession = {
-    getSetting: getSetting, setSetting: setSetting,
+    getSetting: getSetting, setSetting: setSetting, applyRemoteSettings: applyRemoteSettings,
     getBest: getBest, submitBest: submitBest,
     getJourney: getJourney, recordJourney: recordJourney, totalStars: totalStars,
     getDaily: getDaily, recordDaily: recordDaily, dailyCount: dailyCount,

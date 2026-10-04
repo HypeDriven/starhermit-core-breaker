@@ -9,11 +9,11 @@
 | | |
 |---|---|
 | Genre | One-button timing action (hold/release), score attack |
-| Players | 1, offline-capable; asynchronous score comparison through the bundled server script |
+| Players | 1, offline-capable; scores compared on device-local boards (plus the platform board when signed in) |
 | Session | A round lasts 5–60 s (3-layer lessons to the 40-layer Long Core); a typical sitting is 5–15 min of retries and next-stage chaining |
 | Platforms | Desktop and mobile browsers with WebGL; keyboard, mouse and touch |
 | Rendering | Three.js (ES module in `vendor/`) WebGL canvas for the shaft; all menus, HUD and dialogs are semantic HTML layered over it |
-| Simulation | Pure deterministic rules engine, fixed 60 Hz tick, integer fixed-point; replays hash-verified server-side |
+| Simulation | Pure deterministic rules engine, fixed 60 Hz tick, integer fixed-point; replays hash-verifiable (`server.js`) |
 
 **File map**
 
@@ -28,13 +28,13 @@
 | `js/audio.js` | `CBAudio`: WebAudio buses, Opus one-shots with synth fallback, ambience hum, adaptive pulse music, captions |
 | `js/gfx.js` | `CBGfx` (UMD, pure): graphics presets, per-category overrides, GPU detection, `resolve`/`presetTier`/`describe`, Graphics-panel strings in nine locales |
 | `js/render.js` | `CBRender`: Three.js scene, windowed segment mesh pool, striker, charge pips, particles, shaft surround, camera drift/shake, graphics settings, post-processing chain, adaptive resolution |
-| `js/main.js` | UI shell: screens, overlays, settings, input, play lifecycle, HUD, results, achievements, server calls |
+| `js/main.js` | UI shell: screens, overlays, settings, input, play lifecycle, HUD, results, achievements, signed-in server-time sync |
 | `server.js` | Static server plus authoritative `/api/v1` script: time, daily metadata, leaderboard, replay-validated score submit |
 | `starhermit.txt` | Platform manifest (`name`, `launch`, `owner`, `server=server.js`, `version`, `contentVersion`, `cover`) |
 | `sfx/` | 16 Opus clips, `manifest.txt` (canonical binding list), `manifest.json` (generator input), `manifest.md` |
 | `assets/` | `key-art.webp` (title backdrop), `core-reached.webp` / `dive-over.webp` (results illustrations) |
 | `coverart.png`, `icon.png`, `favicon.svg` | Store cover (1200×675), 256 px icon, SVG favicon |
-| `tests/run_tests.js`, `tests/gfx.test.js`, `tests/e2e.mjs` | `npm test` rules/content/server suite plus the `node --test` graphics-model suite; Playwright playthrough at desktop and mobile viewports |
+| `tests/run_tests.js`, `tests/gfx.test.js`, `tests/platform.test.mjs`, `tests/e2e.mjs` | `npm test` rules/content/server suite plus the `node --test` graphics-model and StarHermit-adapter suites; Playwright playthrough at desktop and mobile viewports |
 | `tests/browser_smoke.js` | Legacy CDP smoke script (not part of `npm test`) |
 | `tools/` | Dev-only; `scores.json` is written here by the server at runtime |
 | `vendor/three.module.min.js` | Three.js r160 (MIT), mapped as `three` by the page's import map |
@@ -47,7 +47,7 @@
 2. **Momentum is a promise you keep.** The score comes from unbroken streaks (×1…×8) and releasing resets them to zero. Rules in: gaps that preserve the streak, overdrive that lets a full charge blast through armor without releasing. Rules out: soft penalties for releasing; the streak reset is total and visible.
 3. **Hovering costs depth.** Releasing is never free: the striker climbs back while hovering (`recover` in `rules.js simulate`). Rules in: timing pressure without a health bar. Rules out: hovering as a safe idle; timers as the only pressure.
 4. **The shaft is the hero.** The camera frames the rotating ring of segments; every state change (break, pass, overdrive, crash, core) happens on that ring with a burst and a sound. Rules in: readable segment colours that survive high contrast, particles that never hide the next layer. Rules out: UI chrome competing with the ring, post-processing that the design depends on.
-5. **Every run is a proof.** Seeds, integer physics and an ordered command log make every round replayable; the server accepts a score only if it can reproduce the final hash. Rules in: daily seeds shared by everyone, practice seeds that are random and therefore unranked. Rules out: client-trusted scores, hidden modifiers.
+5. **Every run is a proof.** Seeds, integer physics and an ordered command log make every round replayable; a verifier (`server.js`) accepts a score only if it can reproduce the final hash. Rules in: daily seeds shared by everyone, practice seeds that are random and therefore unranked. Rules out: client-trusted scores, hidden modifiers.
 
 ## 3. Player experience
 
@@ -98,10 +98,10 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 |---|---|---|---|---|
 | Learn | Title **Learn**; also **Play** for new pilots | 5 forced-layout lessons `t1–t5`, each with an event goal; next unfinished lesson opens first | per lesson | unranked, never submitted |
 | Journey | **Journey** grid or **Play** (first unfinished stage) | 40 authored stages `j01–j40`, 6→32 layers, 6→10 sectors, armor 0→40 %, rotSpeed 0→17, fallSpeed 30→62; mastery stages j10/j20/j30/j40 (gold border); timers on j15, j20, j25, j30, j35, j40 | on / on | local best per board `journey`; submitted to server board `journey` |
-| Daily | **Daily Challenge** | `dailyConfig(date)`: layers 12–18, sectors 7–9, armor 18–30 %, 7-day rotation of parameters, timer only on `rot === 6`; countdown to next UTC day uses server offset when reachable | off / on | local `dailies[date]`, server board `daily` |
+| Daily | **Daily Challenge** | `dailyConfig(date)`: layers 12–18, sectors 7–9, armor 18–30 %, 7-day rotation of parameters, timer only on `rot === 6`; countdown to next UTC day uses server offset when signed in | off / on | local `dailies[date]` |
 | Practice | **Practice** | Calm / Standard / Intense presets, random seed, theme picker | on / on | local best only (`practice-<id>`); never submitted |
-| Challenges | **Challenges** | c1 Blitz Shaft (42 s), c2 Plated Descent (46 % armor), c3 Raw Crystal (no charge cell), c4 Narrow Bands (5 sectors, rot 18), c5 The Long Core (40 layers, undo on), c6 Glass Gauntlet (no assists) | per challenge | local best, server board `challenge-<id>` |
-| Score Chase | **Score Chase** | `SCORE_CHASE` endless ruleset, armor ramps with depth | off / off | local top-25 board (`corebreaker.scoreboard.v1`), server board `score` |
+| Challenges | **Challenges** | c1 Blitz Shaft (42 s), c2 Plated Descent (46 % armor), c3 Raw Crystal (no charge cell), c4 Narrow Bands (5 sectors, rot 18), c5 The Long Core (40 layers, undo on), c6 Glass Gauntlet (no assists) | per challenge | local best |
+| Score Chase | **Score Chase** | `SCORE_CHASE` endless ruleset, armor ramps with depth | off / off | local top-25 board (`corebreaker.scoreboard.v1`) |
 
 **Stars and unlocks.** Winning a journey stage gives 1 star, beating `par.timeSec` gives 2 (`Session.recordJourney`). Stage N+1 unlocks when stage N has ≥ 1 star. Total stars unlock themes: Abyssal Violet 0, Glacial Deep 10, Ember Reactor 25, Verdant Core 45, Solar Forge 70. Themes are cosmetic (palette only) and apply to Practice via the theme picker; journey/challenge/daily stages carry their own theme.
 
@@ -112,7 +112,7 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 | Input | Action | Where bound |
 |---|---|---|
 | Pointer down / up on the canvas or **HOLD TO DIVE** | press / release (pointer capture; `pointercancel` and `lostpointercapture` release) | `main.js bindHold` |
-| Space (hold) | press on keydown, release on keyup; `e.repeat` ignored | `keydown` / `keyup` |
+| Space (hold) | press on keydown, release on keyup; `e.repeat` ignored. All keys are matched by `event.code` through the platform bindings (§12) | `keydown` / `keyup` |
 | Enter | toggles hold/hover | `keydown` |
 | P, Escape | pause / resume (Escape also closes Settings/Help, backs out of screens) | `keydown` |
 | U, **Undo** (HUD and tray) | undo when legal; otherwise announces "Nothing to undo." | `doUndo` |
@@ -202,29 +202,35 @@ Shipped language: **English (en-US)** only, except the Settings → Graphics sec
 
 ## 12. StarHermit integration
 
-Manifest: `starhermit.txt` declares `name=Core Breaker`, `launch=index.html`, `owner`, `server=server.js`, `version=1.0.0`, `contentVersion=1`, `cover=coverart.png` per the packaging conventions on https://wiki.starhermit.com/.
+Manifest: `starhermit.txt` declares `name=Core Breaker`, `launch=index.html`, `owner`, `server=server.js`, `version=1.0.0`, `contentVersion=1`, `cover`, and one `control.<action>=<Code> | <Label>` line per keyboard action: `dive`=Space, `toggle`=Enter, `pause`=KeyP, `undo`=KeyU, `retry`=KeyR, `back`=Escape.
+
+All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/starhermit-sdk.js`, loaded before `js/platform.js`). `js/platform.js` (`CBPlatform`) is a thin adapter over `window.StarHermit` that keeps the game's API.
 
 | Platform feature | Status |
 |---|---|
-| Game script (`server=server.js`) | Used. Serves the distribution; `GET /api/v1/time` (clock sync), `GET /api/v1/daily?date=` (immutable daily metadata), `GET /api/v1/leaderboard?board=`, `POST /api/v1/score` (replays the command log through `rules.js`, rejects stale content version, out-of-bounds configs, illegal commands, hash or score mismatch; boards capped at 50 entries in `tools/scores.json`) |
-| Server time | Used. `syncServerTime` computes a round-trip-adjusted offset; the daily countdown says "(server time)" or "(local clock)" |
-| Identity / profile | Used when hosted. `#game_token=<jwt>` read from the URL fragment (stripped after the read; query forms for local dev), decoded for `sub` + `game_scope` (never hard-coded), sent as `Authorization: Bearer` on every hosted call, re-minted every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry). The title shows "Playing as <nickname> · sync status" from `GET /api/v1/users/{sub}/profile` (never usernames, never `/api/v1/me`; `Player <id8>` fallback); submissions carry the account nickname + id (was the fixed `local pilot`) |
-| Presence, activity, sessions, rooms, chat, voice | Not used (solo game) |
-| Leaderboards | Server boards are written and validated (its-backend route, graceful offline); when hosted with a `leaderboardId`, the Score Chase screen also reads the platform board via `GET /api/v1/games/{slug}` → `GET /api/v1/leaderboards/{id}/entries` (nicknames resolved, own row marked) above the local board |
-| Achievements | Local only (`localStorage`, part of the cloud-saved doc), not delivered to the platform |
-| Cloud save | Used when hosted: the checksummed session doc mirrors to one zip+base64 slot at `GET/PUT /api/v1/me/cloud-saves/{slug}` — remote wins on boot (`CBSession.importWrapped` validates version + checksum), saves debounce 2 s and flush on `pagehide`/hidden with keepalive, sync status on the title. localStorage stays the offline cache |
+| Game script (`server=server.js`) | Serves the distribution; `GET /api/v1/time` (clock sync) is the only route the client calls, and only when signed in — standalone uses the local clock and makes no `/api` or `/ws` request. Kept for tests but not called by the client: `GET /api/v1/daily?date=` (immutable daily metadata), `GET /api/v1/leaderboard?board=`, `POST /api/v1/score` (replays the command log through `rules.js`, rejects stale content version, out-of-bounds configs, illegal commands, hash or score mismatch; boards capped at 50 entries in `tools/scores.json`). The time request carries `CBPlatform.headers()` and fails silently |
+| Launch token / renewal | `StarHermit.init()` reads `#game_token=` (library) or `#access_token=` (sign-in return), strips it, takes the slug from `game_scope` and renews before expiry. If renewal is refused the title returns to the offline line and sign-in button; play continues locally |
+| Sign-in | On `*.starhermit.com` without a token the title shows "Sign in with StarHermit" (`StarHermit.signIn()`); hidden when signed in or running locally |
+| Identity / profile | The title shows "Playing as <nickname> · sync status" from `StarHermit.profile()` (nickname, `Player <id>` fallback) |
+| Cloud save | The checksummed session doc is mirrored with `StarHermit.saveJSON` (2 s debounce) to `/api/v1/me/cloud-saves/game:<slug>`, flushed with keepalive on `pagehide`/hidden. Remote wins on boot (`loadJSON` → `CBSession.importWrapped` validates version + checksum); localStorage stays the offline cache |
+| Settings KV | Every `CBSession.setSetting` (volumes, mute, captions, graphics preset + overrides, reduced motion, high contrast, large text, left-handed, hold toggle, timing assist, theme) is mirrored with `patchSettings` (400 ms debounce). On boot `getSettings()` is applied over the local doc (platform wins) |
+| Invite link | When signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked) |
+| Controls | Keydown/keyup are routed by `event.code` through `StarHermit.loadBindings(defaults)`; How to Play lists the effective keys. No in-game rebinding UI |
+| Leaderboards | Boards are local to the device; nothing is submitted to the own server. When signed in, Score Chase also reads the platform board with `StarHermit.leaderboard()` (nicknames resolved, own row marked) above the local board |
+| Achievements | Local only (part of the cloud-saved doc); the game's server reports no platform achievements |
+| Sessions, matchmaking, invites to sessions, chat, replays, voice, realtime | Not used: solo game, and `server.js` is not a platform session script |
 
-The game is fully playable with the server unreachable or from `file:` (all fetches are guarded and failures are silent).
+New platform strings (account line, sign-in, invite, toast) are localized in the nine supported locales via `Gfx.pickLocale`. Without a token the game makes no StarHermit calls; it stays fully playable with the server unreachable or from `file:`.
 
 ## 13. Technical architecture
 
 - **Module boundaries.** `rules.js` and `content.js` are UMD and shared verbatim by browser, tests and `server.js`. `main.js` mutates game state only through `Rules.applyCommand`; `render.js` reads snapshots and never writes them; `audio.js` and `session.js` are side-effect sinks.
 - **Loop.** `setInterval(1000/60)` issues `{type:'wait', atTick: tick+1}` per tick (`tickStep`); `requestAnimationFrame` draws the latest snapshot (`frameLoop`). Input commands are applied at the current tick, so the log is exact and replayable.
-- **Replay envelope.** `{v:1, contentVersion, cfg, seed, log, hash, score, atMs}` saved as `lastReplay` and POSTed to the server (except Learn and Practice). The results screen prints hash, seed and command count, then appends "server validated (rank n)" or the server's error.
+- **Replay envelope.** `{v:1, contentVersion, cfg, seed, log, hash, score, atMs}` saved as `lastReplay` (not submitted anywhere). The results screen prints hash, seed and command count.
 - **Persistence.** `localStorage` key `corebreaker.progress.v1` = `{v, data, sum}` with FNV-1a checksum; unknown version or bad checksum starts clean. Fields: journey stars/best, bests per board, dailies, tutorialDone, achievements, totals, settings, lastReplay. Score Chase keeps a separate `corebreaker.scoreboard.v1` list.
 - **Rendering budget.** Windowed mesh pool: 3 layers above and 12 below the striker, at most 15 × sectors segment meshes (≤ 150 at 10 sectors) sharing two materials per surface detail level, plus 140 pooled particle shards, one surround wall, one beam and one 160-point mote cloud; graphics presets and overrides as in §8 **Graphics**. Light counts never change at runtime (the core light is dimmed, not hidden) so no shader recompiles happen mid-round.
 - **Server hardening.** 256 KB body cap, 20 000 command cap, 15-minute simulated-time cap, config bounds (`CFG_LIMITS`), path traversal and `.git`/`node_modules` refusal.
-- **E2E driving.** `tests/e2e.mjs` starts `server.js` on an ephemeral port with `CB_SCORES_FILE` redirected, launches system Chrome with SwiftShader, and plays through the visible UI only: clicks real buttons, holds Space (desktop) or the on-screen HOLD button (mobile, `hasTouch`), reads the hint pill text to decide when to release, and checks localStorage progress.
+- **E2E driving.** `tests/e2e.mjs` starts `server.js` as a static host on an ephemeral port with `CB_SCORES_FILE` redirected (standalone passes fail on any same-origin `/api` or `/ws` request; the signed-in pass allows only platform routes and `GET /api/v1/time`), launches system Chrome with SwiftShader, and plays through the visible UI only: clicks real buttons, holds Space (desktop) or the on-screen HOLD button (mobile, `hasTouch`), reads the hint pill text to decide when to release, and checks localStorage progress.
 
 ## 14. Testing and acceptance criteria
 
@@ -232,7 +238,9 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 
 `tests/gfx.test.js` (`node --test`, part of `npm test`): `detectPreset` on sample GPU strings, mobile cap, `resolve` with preset / override / invalid tier / scale clamp, preset choice clears overrides, `presetTier`/`describe`, every locale has every string, locale picking.
 
-`tests/e2e.mjs` (desktop 1280×800 keyboard, mobile 390×844 touch): title loads without the WebGL compat note; settings apply high contrast/reduced motion/Balanced quality; Graphics: Auto label shows the detected tier, Low then High change `data-gfx-preset` and the summary, a Bloom override and Show frame rate apply, all three survive a reload, choosing Low clears the override; help shows ≥ 3 cards; Learn opens lesson 1; journey grid has 40 stages with 1 unlocked; stage 1 is won with a 7-row breakdown and "server validated"; stars persist; stage 2 undo rewinds depth exactly, pause → settings → resume → win; Practice Calm reaches results by hint-driven dodging; Daily and Score screens render; hold button ≥ 44 px; zero console errors/warnings and page errors.
+`tests/platform.test.mjs` (`node --test`, part of `npm test`) loads the SDK and `js/platform.js` in a vm sandbox with a stubbed `fetch` and launch hash: token read and fragment strip, profile nickname, `game:<slug>` cloud-save round-trip, settings patch, binding overrides, invite link, platform leaderboard rows, and no fetch at all when standalone. `tests/e2e.mjs` additionally fails if a standalone pass calls a StarHermit route, and runs a signed-in pass on both viewports (stubbed platform API): nickname shown, save loaded from `game:core-breaker`, fragment stripped, platform setting (large text) applied, Invite a friend toast, How to Play lists the platform binding, Score Chase shows the platform board.
+
+`tests/e2e.mjs` (desktop 1280×800 keyboard, mobile 390×844 touch): title loads without the WebGL compat note; settings apply high contrast/reduced motion/Balanced quality; Graphics: Auto label shows the detected tier, Low then High change `data-gfx-preset` and the summary, a Bloom override and Show frame rate apply, all three survive a reload, choosing Low clears the override; help shows ≥ 3 cards; Learn opens lesson 1; journey grid has 40 stages with 1 unlocked; stage 1 is won with a 7-row breakdown; stars persist; stage 2 undo rewinds depth exactly, pause → settings → resume → win; Practice Calm reaches results by hint-driven dodging; Daily and Score screens render; hold button ≥ 44 px; zero console errors/warnings and page errors.
 
 **QA bar as checkable statements.** A new player sees instructions (lesson text, hint pill, stage intros) before needing them. Every feature in the UI is reachable in the browser by click/tap and by keyboard. No console errors or warnings during the playthrough. Text and controls are visible and not cut off at 1280×800 and 390×844 in both orientations. The game stays playable when the server, audio or an image is unavailable.
 
@@ -253,9 +261,8 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 ## 16. Known limitations
 
 - English only; no locale switching (see intent below).
-- The own-server `GET /api/v1/leaderboard` is still not read; the hosted Score Chase shows the platform leaderboard instead.
-- All submissions are named `local pilot`, so server boards cannot tell players apart; duplicates are collapsed by name + score + seed + duration.
-- The `daily` and `journey` server boards mix every date / stage into one list; the HUD "Best" in Journey is the best across all stages, not the current stage.
+- Own-server leaderboards are not used; the signed-in Score Chase shows the platform leaderboard.
+- The HUD "Best" in Journey is the best across all stages, not the current stage.
 - Achievements never leave the device.
 - Backgrounding during the 3-2-1 countdown does not pause; the round starts and ticks slowly in the background until the tab returns.
 - Particle bursts are not suppressed by reduced motion.
@@ -265,7 +272,7 @@ The game is fully playable with the server unreachable or from `file:` (all fetc
 ## Design intent not yet implemented
 
 - Localization for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT with a string table and language selection from the platform locale.
-- Fetching and showing the own-server validated leaderboards (global and friends-filtered) on the Score Chase, Daily and Challenge screens, beyond the platform board.
+- Shared cross-player leaderboards (global and friends-filtered) on the Score Chase, Daily and Challenge screens, beyond the platform board.
 - Delivering achievements through the platform.
 - Per-stage HUD best in Journey and per-date daily boards.
 - Suppressing particle bursts under reduced motion.
