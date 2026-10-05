@@ -34,6 +34,10 @@ body.high-contrast {
 
 #cb-root { position: fixed; inset: 0; overflow: hidden; }
 #game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* Large screens: every DOM UI layer over the canvas (HUD, tray, screens, overlays, toast, FPS meter) zooms by
+   --ui-scale (ui-scale.js; 1 up to 1600x1000); vh/vw inside them are divided by it. The full-viewport 3D
+   canvas is not zoomed. */
+#cb-root > :not(#game-canvas), #fps-meter { zoom: var(--ui-scale, 1); }
 
 /* ---------- generic ---------- */
 button {
@@ -82,7 +86,7 @@ p { max-width: 70ch; }
 }
 .title-logo { font-size: clamp(34px, 7vw, 60px); letter-spacing: 0.06em; color: var(--accent); text-shadow: 0 0 24px rgba(155, 232, 255, 0.4); }
 .subtitle { color: var(--dim); margin-top: -6px; }
-.menu-col { display: flex; flex-direction: column; gap: 10px; width: min(320px, 90vw); }
+.menu-col { display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(90vw / var(--ui-scale, 1))); }
 .menu-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
 .level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; width: 100%; }
@@ -104,7 +108,7 @@ p { max-width: 70ch; }
 .overlay .card {
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 14px; padding: 22px 26px; max-width: 560px; width: 100%;
-  max-height: 86vh; overflow-y: auto;
+  max-height: calc(86vh / var(--ui-scale, 1)); overflow-y: auto;
 }
 .overlay .card .menu-col { width: 100%; }
 
