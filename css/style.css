@@ -229,3 +229,13 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
   .settings-row input[type="range"] { width: 120px; }
 }
 select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Phone landscape: the title menu fits without scrolling — the six mode
+   buttons go three-across and the logo shrinks, so Settings stays in view. */
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-title { gap: 8px; }
+  #screen-title .title-logo { font-size: 34px; }
+  #screen-title .menu-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(560px, calc(92vw / var(--ui-scale, 1))); }
+  #screen-title .menu-row { gap: 8px; }
+  #screen-title .small { margin: 0; }
+}

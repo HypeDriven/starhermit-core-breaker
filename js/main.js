@@ -107,7 +107,8 @@
     if (replace) screenStack = [id];
     else if (screenStack[screenStack.length - 1] !== id) screenStack.push(id);
     var first = $(id).querySelector('button');
-    if (first) first.focus();
+    if (first) first.focus({ preventScroll: true });
+    resetScroll($(id));
     if (id === 'screen-journey') renderJourneyGrid();
     if (id === 'screen-daily') renderDailyScreen();
     if (id === 'screen-score') renderScoreScreen();
@@ -131,7 +132,15 @@
     overlayReturnFocus = document.activeElement;
     $(id).classList.remove('hidden');
     var first = $(id).querySelector('button.primary') || $(id).querySelector('button');
-    if (first) first.focus();
+    if (first) first.focus({ preventScroll: true });
+    resetScroll($(id));
+  }
+  // Screens and dialogs open at their top (heading visible), even when the
+  // focused button (often Done at the bottom) is below the fold.
+  function resetScroll(root) {
+    root.scrollTop = 0;
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) if (all[i].scrollTop) all[i].scrollTop = 0;
   }
   function closeOverlay(id) {
     $(id).classList.add('hidden');
