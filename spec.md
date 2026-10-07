@@ -112,7 +112,7 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 
 | Input | Action | Where bound |
 |---|---|---|
-| Pointer down / up on the canvas or **HOLD TO DIVE** | press / release (pointer capture; `pointercancel` and `lostpointercapture` release) | `main.js bindHold` |
+| Pointer down / up on the canvas or **HOLD TO DIVE** | press / release (pointer capture; `pointercancel` and `lostpointercapture` release). The hold is owned by the pointer that started it (pointerId + pointerType): other pointers neither start a second hold nor end it, so a second finger or a tap on Undo never ends the dive | `main.js bindHold` |
 | Space (hold) | press on keydown, release on keyup; `e.repeat` ignored. All keys are matched by `event.code` through the platform bindings (§12) | `keydown` / `keyup` |
 | Enter | toggles hold/hover | `keydown` |
 | P, Escape | pause / resume (Escape also closes Settings/Help, backs out of screens) | `keydown` |

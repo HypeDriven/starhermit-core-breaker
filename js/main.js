@@ -719,27 +719,36 @@
     updateHUD();
   }
 
-  // pointer hold on canvas + hold button
-  var pointerHeld = false;
+  // pointer hold on canvas + hold button. The hold belongs to the pointer
+  // that started it (id + type): a second finger, or a tap elsewhere that
+  // steals capture, must not end a dive the first pointer is still holding.
+  var holdPointer = null;
+  function isHoldPointer(ev) {
+    return !!holdPointer && ev.pointerId === holdPointer.id && ev.pointerType === holdPointer.type;
+  }
   function bindHold(el) {
     el.addEventListener('pointerdown', function (ev) {
       if (ev.button != null && ev.button !== 0) return;
       ev.preventDefault();
+      if (holdPointer && !isHoldPointer(ev)) return; // another pointer already owns the hold
       try { el.setPointerCapture(ev.pointerId); } catch (e) {}
-      pointerHeld = true;
+      holdPointer = { id: ev.pointerId, type: ev.pointerType };
       if (Session.getSetting('holdToggle')) {
         if (playState && playState.holding) cmdRelease(); else cmdPress();
       } else cmdPress();
     });
-    var up = function (ev) {
-      if (!pointerHeld) return;
-      pointerHeld = false;
-      if (!Session.getSetting('holdToggle')) cmdRelease();
-    };
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
-    el.addEventListener('lostpointercapture', up);
+    el.addEventListener('pointerup', holdUp);
+    el.addEventListener('pointercancel', holdUp);
+    el.addEventListener('lostpointercapture', holdUp);
   }
+  function holdUp(ev) {
+    if (!isHoldPointer(ev)) return;
+    holdPointer = null;
+    if (!Session.getSetting('holdToggle')) cmdRelease();
+  }
+  // safety net if capture was refused and the pointer lifts elsewhere
+  document.addEventListener('pointerup', holdUp);
+  document.addEventListener('pointercancel', holdUp);
   bindHold($('game-canvas'));
   bindHold($('btn-hold'));
   $('game-canvas').addEventListener('contextmenu', function (e) { e.preventDefault(); });
