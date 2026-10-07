@@ -30,8 +30,9 @@
 | `js/gfx.js` | `CBGfx` (UMD, pure): graphics presets, per-category overrides, GPU detection, `resolve`/`presetTier`/`describe`, Graphics-panel strings in nine locales |
 | `js/render.js` | `CBRender`: Three.js scene, windowed segment mesh pool, striker, charge pips, particles, shaft surround, camera drift/shake, graphics settings, post-processing chain, adaptive resolution |
 | `js/main.js` | UI shell: screens, overlays, settings, input, play lifecycle, HUD, results, achievements, signed-in server-time sync |
-| `server.js` | Static server plus authoritative `/api/v1` script: time, daily metadata, leaderboard, replay-validated score submit |
-| `starhermit.txt` | Platform manifest (`name`, `launch`, `owner`, `server=server.js`, `version`, `contentVersion`, `cover`) |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished Score Chase total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
+| `server.js` | Local dev server plus legacy `/api/v1` routes: time, daily metadata, leaderboard, replay-validated score submit |
+| `starhermit.txt` | Platform manifest (`name`, `launch`, `owner`, `server=score-script.js`, `version`, `contentVersion`, `cover`) |
 | `sfx/` | 16 Opus clips, `manifest.txt` (canonical binding list), `manifest.json` (generator input), `manifest.md` |
 | `assets/` | `key-art.webp` (title backdrop), `core-reached.webp` / `dive-over.webp` (results illustrations) |
 | `coverart.png`, `icon.png`, `favicon.svg` | Store cover (1200×675), 256 px icon, SVG favicon |
@@ -102,7 +103,7 @@ Every generated layer contains at least one non-armor segment (`generateLayer`),
 | Daily | **Daily Challenge** | `dailyConfig(date)`: layers 12–18, sectors 7–9, armor 18–30 %, 7-day rotation of parameters, timer only on `rot === 6`; countdown to next UTC day uses server offset when signed in | off / on | local `dailies[date]` |
 | Practice | **Practice** | Calm / Standard / Intense presets, random seed, theme picker | on / on | local best only (`practice-<id>`); never submitted |
 | Challenges | **Challenges** | c1 Blitz Shaft (42 s), c2 Plated Descent (46 % armor), c3 Raw Crystal (no charge cell), c4 Narrow Bands (5 sectors, rot 18), c5 The Long Core (40 layers, undo on), c6 Glass Gauntlet (no assists) | per challenge | local best |
-| Score Chase | **Score Chase** | `SCORE_CHASE` endless ruleset, armor ramps with depth | off / off | local top-25 board (`corebreaker.scoreboard.v1`) |
+| Score Chase | **Score Chase** | `SCORE_CHASE` endless ruleset, armor ramps with depth | off / off | local top-25 board (`corebreaker.scoreboard.v1`); signed in, also the platform `high-score` board |
 
 **Stars and unlocks.** Winning a journey stage gives 1 star, beating `par.timeSec` gives 2 (`Session.recordJourney`). Stage N+1 unlocks when stage N has ≥ 1 star. Total stars unlock themes: Abyssal Violet 0, Glacial Deep 10, Ember Reactor 25, Verdant Core 45, Solar Forge 70. Themes are cosmetic (palette only) and apply to Practice via the theme picker; journey/challenge/daily stages carry their own theme.
 
@@ -203,13 +204,14 @@ Shipped language: **English (en-US)** only, except the Settings → Graphics sec
 
 ## 12. StarHermit integration
 
-Manifest: `starhermit.txt` declares `name=Core Breaker`, `launch=index.html`, `owner`, `server=server.js`, `version=1.0.0`, `contentVersion=1`, `cover`, and one `control.<action>=<Code> | <Label>` line per keyboard action: `dive`=Space, `toggle`=Enter, `pause`=KeyP, `undo`=KeyU, `retry`=KeyR, `back`=Escape.
+Manifest: `starhermit.txt` declares `name=Core Breaker`, `launch=index.html`, `owner`, `server=score-script.js`, `version=1.0.0`, `contentVersion=1`, `cover`, and one `control.<action>=<Code> | <Label>` line per keyboard action: `dive`=Space, `toggle`=Enter, `pause`=KeyP, `undo`=KeyU, `retry`=KeyR, `back`=Escape.
 
 All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/starhermit-sdk.js`, loaded before `js/platform.js`). `js/platform.js` (`CBPlatform`) is a thin adapter over `window.StarHermit` that keeps the game's API.
 
 | Platform feature | Status |
 |---|---|
-| Game script (`server=server.js`) | Serves the distribution; `GET /api/v1/time` (clock sync) is the only route the client calls, and only when signed in — standalone uses the local clock and makes no `/api` or `/ws` request. Kept for tests but not called by the client: `GET /api/v1/daily?date=` (immutable daily metadata), `GET /api/v1/leaderboard?board=`, `POST /api/v1/score` (replays the command log through `rules.js`, rejects stale content version, out-of-bounds configs, illegal commands, hash or score mismatch; boards capped at 50 entries in `tools/scores.json`). The time request carries `CBPlatform.headers()` and fails silently |
+| Platform script (`server=score-script.js`) | Runs for the practice session `StarHermit.submitScores` opens: accepts one `high-score` value (integer, 0–10,000,000) and posts it to that board |
+| Local dev server (`server.js`) | Serves the distribution; `GET /api/v1/time` (clock sync) is the only route the client calls, and only when signed in — standalone uses the local clock and makes no `/api` or `/ws` request. Kept for tests but not called by the client: `GET /api/v1/daily?date=` (immutable daily metadata), `GET /api/v1/leaderboard?board=`, `POST /api/v1/score` (replays the command log through `rules.js`, rejects stale content version, out-of-bounds configs, illegal commands, hash or score mismatch; boards capped at 50 entries in `tools/scores.json`). The time request carries `CBPlatform.headers()` and fails silently |
 | Launch token / renewal | `StarHermit.init()` reads `#game_token=` (library) or `#access_token=` (sign-in return), strips it, takes the slug from `game_scope` and renews before expiry. If renewal is refused the title returns to the offline line and sign-in button; play continues locally |
 | Sign-in | On `*.starhermit.com` without a token the title shows "Sign in with StarHermit" (`StarHermit.signIn()`); hidden when signed in or running locally |
 | Identity / profile | The title shows "Playing as <nickname> · sync status" from `StarHermit.profile()` (nickname, `Player <id>` fallback) |
@@ -217,11 +219,11 @@ All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/
 | Settings KV | Every `CBSession.setSetting` (volumes, mute, captions, graphics preset + overrides, reduced motion, high contrast, large text, left-handed, hold toggle, timing assist, theme) is mirrored with `patchSettings` (400 ms debounce). On boot `getSettings()` is applied over the local doc (platform wins) |
 | Invite link | When signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked) |
 | Controls | Keydown/keyup are routed by `event.code` through `StarHermit.loadBindings(defaults)`; How to Play lists the effective keys. No in-game rebinding UI |
-| Leaderboards | Boards are local to the device; nothing is submitted to the own server. When signed in, Score Chase also reads the platform board with `StarHermit.leaderboard()` (nicknames resolved, own row marked) above the local board |
+| Leaderboards | When signed in, every finished Score Chase dive posts its total through `StarHermit.submitScores({ 'high-score': total })` to the platform `high-score` board (integer, higher is better, 0–10,000,000); the results card shows "Posting score to the leaderboard…", then "Leaderboard rank: #N" (or "Score posted to the leaderboard." / "Score not posted to the leaderboard."), in all nine locales. Other modes post nothing; standalone posts nothing and shows no line. Local boards stay on the device; nothing is submitted to the own server. When signed in, Score Chase also reads the platform board with `StarHermit.leaderboard()` (nicknames resolved, own row marked) above the local board |
 | Achievements | Local only (part of the cloud-saved doc); the game's server reports no platform achievements |
-| Sessions, matchmaking, invites to sessions, chat, replays, voice, realtime | Not used: solo game, and `server.js` is not a platform session script |
+| Matchmaking, invites to sessions, chat, replays, voice, realtime | Not used: solo game; the only platform session is the short practice session that posts a Score Chase result |
 
-New platform strings (account line, sign-in, invite, toast) are localized in the nine supported locales via `Gfx.pickLocale`. Without a token the game makes no StarHermit calls; it stays fully playable with the server unreachable or from `file:`.
+New platform strings (account line, sign-in, invite, toast, leaderboard result) are localized in the nine supported locales via `Gfx.pickLocale`. Without a token the game makes no StarHermit calls; it stays fully playable with the server unreachable or from `file:`.
 
 ## 13. Technical architecture
 
@@ -262,7 +264,7 @@ New platform strings (account line, sign-in, invite, toast) are localized in the
 ## 16. Known limitations
 
 - English only; no locale switching (see intent below).
-- Own-server leaderboards are not used; the signed-in Score Chase shows the platform leaderboard.
+- Own-server leaderboards are not used; the signed-in Score Chase posts to and shows the platform leaderboard.
 - The HUD "Best" in Journey is the best across all stages, not the current stage.
 - Achievements never leave the device.
 - Backgrounding during the 3-2-1 countdown does not pause; the round starts and ticks slowly in the background until the tab returns.

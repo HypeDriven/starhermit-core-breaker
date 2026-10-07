@@ -146,8 +146,23 @@
     return hosted;
   }
 
+  /* Post a finished Score Chase dive to the leaderboards (score-script.js);
+   * resolves { posted, rank } — rank on the high-score board, or null. */
+  function submitScore(total) {
+    var s = sdk();
+    if (!s || !hosted || typeof s.submitScores !== 'function') return Promise.resolve({ posted: false, rank: null });
+    return s.submitScores({ 'high-score': total }).then(function (keys) {
+      if (!keys || keys.indexOf('high-score') < 0) return { posted: false, rank: null };
+      return s.leaderboard('high-score', { pageSize: 100 }).then(function (r) {
+        var me = ((r && r.items) || []).filter(function (i) { return i.userId === s.userId; })[0];
+        return { posted: true, rank: me ? me.rank : null };
+      }, function () { return { posted: true, rank: null }; });
+    }, function () { return { posted: false, rank: null }; });
+  }
+
   return {
     init: init,
+    submitScore: submitScore,
     headers: headers,
     profileFor: profileFor,
     fetchProfile: fetchProfile,
