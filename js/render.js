@@ -731,9 +731,9 @@
     var key = currentPostKey(w, h);
     if (key !== postKey) { postKey = key; buildPost(w, h); }
     if (composer) {
-      try { composer.render(dtMs / 1000); return; } catch (e) { postFailed = true; composer.dispose(); composer = null; }
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dtMs / 1000)) : composer.render(dtMs / 1000)); return; } catch (e) { postFailed = true; composer.dispose(); composer = null; }
     }
-    renderer.render(scene, camera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
   }
 
   function syncPips(state) {

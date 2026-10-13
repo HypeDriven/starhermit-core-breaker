@@ -90,7 +90,7 @@
     if (!name || !ctx) return false;
     var st = sampleState[name];
     if (st === 'ready') {
-      var src = ctx.createBufferSource();
+      var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), key) : ctx.createBufferSource());
       src.buffer = sampleBuffers[name];
       src.connect(busSfx);
       src.start();
@@ -102,7 +102,7 @@
 
   function blip(freq, dur, gain, type, slideTo) {
     if (!ensure()) return;
-    var o = ctx.createOscillator(), g = ctx.createGain();
+    var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()), g = ctx.createGain();
     o.type = type || 'sine';
     o.frequency.setValueAtTime(freq, ctx.currentTime);
     if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ctx.currentTime + dur);
@@ -117,7 +117,7 @@
     var len = Math.floor(ctx.sampleRate * dur);
     var buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
     for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    var src = ctx.createBufferSource(), g = ctx.createGain();
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource()), g = ctx.createGain();
     var f = ctx.createBiquadFilter();
     f.type = 'lowpass'; f.frequency.value = lowFreq || 4000;
     src.buffer = buf;
@@ -130,7 +130,7 @@
   // ---------- ambience: quiet reactor hum, pauses when hidden ----------
   function startAmbience() {
     if (!ensure() || ambNodes) return;
-    var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+    var o1 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()), o2 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()), g = ctx.createGain();
     o1.type = 'sine'; o1.frequency.value = 54;
     o2.type = 'triangle'; o2.frequency.value = 108.5;
     g.gain.value = 0.05;
@@ -156,7 +156,7 @@
       var step = musicStep++;
       var semis = SCALE[step % SCALE.length] + 12 * (Math.floor(step / SCALE.length) % 2);
       var f = root * Math.pow(2, semis / 12);
-      var o = ctx.createOscillator(), g = ctx.createGain();
+      var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()), g = ctx.createGain();
       o.type = musicIntensity > 4 ? 'sawtooth' : 'triangle';
       o.frequency.value = f;
       var dur = 0.22, vol = 0.05 + Math.min(0.05, musicIntensity * 0.008);
@@ -165,7 +165,7 @@
       o.connect(g); g.connect(busMusic);
       o.start(); o.stop(ctx.currentTime + dur + 0.02);
       if (musicIntensity >= 3 && step % 2 === 0) { // bass pulse joins at higher momentum
-        var b = ctx.createOscillator(), bg = ctx.createGain();
+        var b = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()), bg = ctx.createGain();
         b.type = 'sine'; b.frequency.value = root / 2;
         bg.gain.setValueAtTime(0.08, ctx.currentTime);
         bg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
