@@ -43,7 +43,7 @@
 
   <!-- title / home -->
   <section id="screen-title" class="screen" aria-labelledby="title-h">
-    <h1 id="title-h" class="title-logo">CORE BREAKER</h1>
+    <h1 id="title-h" class="title-logo" data-i18n-skip>CORE BREAKER</h1>
     <p class="subtitle">Hold to smash crystal. Release before armor. Break the core.</p>
     <div class="menu-col">
       <button id="btn-play" type="button" class="primary">Play</button>
@@ -182,14 +182,14 @@
       <div class="settings-row"><label for="set-mute">Mute all</label><input id="set-mute" type="checkbox" /></div>
       <div class="settings-row"><label for="set-captions">Sound captions</label><input id="set-captions" type="checkbox" /></div>
       <section id="gfx-section" aria-labelledby="gfx-h">
-      <h3 id="gfx-h" data-gfx-text="heading">Graphics</h3>
-      <div class="settings-row"><label for="set-quality" data-gfx-text="quality">Quality</label>
-        <select id="set-quality" data-gfx="preset"><option value="auto">Auto</option><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
-      <div class="settings-row"><label for="set-gfx-scale" data-gfx-text="scale">Render scale</label>
+      <h3 id="gfx-h" data-gfx-text="heading" data-i18n-skip>Graphics</h3>
+      <div class="settings-row"><label for="set-quality" data-gfx-text="quality" data-i18n-skip>Quality</label>
+        <select id="set-quality" data-gfx="preset" data-i18n-skip><option value="auto">Auto</option><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
+      <div class="settings-row"><label for="set-gfx-scale" data-gfx-text="scale" data-i18n-skip>Render scale</label>
         <span class="range-wrap"><input id="set-gfx-scale" data-gfx="render_scale" type="range" min="50" max="200" step="5" value="100" /><output id="gfx-scale-val" for="set-gfx-scale">100%</output></span></div>
       <div id="gfx-cats"></div>
-      <div class="settings-row"><label for="set-gfx-adaptive" data-gfx-text="adaptive">Adaptive resolution</label><input id="set-gfx-adaptive" data-gfx="adaptive" type="checkbox" /></div>
-      <div class="settings-row"><label for="set-gfx-fps" data-gfx-text="showFps">Show frame rate</label><input id="set-gfx-fps" data-gfx="show_fps" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-gfx-adaptive" data-gfx-text="adaptive" data-i18n-skip>Adaptive resolution</label><input id="set-gfx-adaptive" data-gfx="adaptive" type="checkbox" /></div>
+      <div class="settings-row"><label for="set-gfx-fps" data-gfx-text="showFps" data-i18n-skip>Show frame rate</label><input id="set-gfx-fps" data-gfx="show_fps" type="checkbox" /></div>
       <p id="gfx-summary" class="small gfx-summary" aria-live="polite"></p>
       <p id="gfx-post-note" class="small gfx-note hidden" role="note"></p>
       <div class="settings-row"><label for="set-motion">Reduced motion</label><input id="set-motion" type="checkbox" /></div>
@@ -246,6 +246,9 @@
   window.CBThreeAddons = { EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass,
     FXAAShader, RoomEnvironment, RoundedBoxGeometry };
 </script>
+<script defer src="./sh-language.js"></script>
+<script defer src="./js/strings.js"></script>
+<script defer src="./js/i18n.js"></script>
 <script defer src="./js/rng.js"></script>
 <script defer src="./js/content.js"></script>
 <script defer src="./js/rules.js"></script>

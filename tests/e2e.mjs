@@ -20,6 +20,7 @@
  */
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright-core';
+import { stubStarHermit, launchToken } from './starhermit-e2e.mjs';
 
 const require = createRequire(import.meta.url);
 process.env.CB_SCORES_FILE = `/tmp/cb-e2e-scores-${process.pid}.json`;
@@ -392,6 +393,80 @@ async function runPass(tag, contextOpts, inputMode) {
   }
 }
 
+// Signed in against a stubbed StarHermit API whose account prefers fr-CA:
+// Automatic resolves to Canadian French; switching to Italian from Settings
+// while a dive is paused re-renders the HUD, tray and dialogs in place without
+// touching the round, syncs ui.language, and Report a problem posts.
+async function languagePass(tag, contextOpts) {
+  const context = await browser.newContext(contextOpts);
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const click = (sel) => (contextOpts.hasTouch ? page.tap(sel) : page.click(sel));
+  try {
+    const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+    await page.goto('about:blank');
+    await page.goto(BASE + 'index.html#game_token=' + launchToken(), { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA' && document.getElementById('btn-play').textContent === 'Jouer', null, { timeout: 10000 });
+    await click('#btn-journey');
+    await page.waitForSelector('#screen-journey:not(.hidden)');
+    await click('#journey-grid button');
+    await page.waitForSelector('#overlay-intro:not(.hidden)');
+    if ((await page.textContent('#intro-h')) !== 'Première descente') throw new Error('intro not French');
+    await click('#btn-intro-start');
+    await page.waitForFunction(() => /^Objectif : atteignez le noyau/.test(document.getElementById('hud-objective').textContent));
+    await page.waitForTimeout(2600); // countdown
+    const depth = await page.textContent('#hud-depth');
+    await click('#btn-hud-pause');
+    await page.waitForSelector('#overlay-pause:not(.hidden)');
+    if ((await page.textContent('#pause-h')) !== 'En pause') throw new Error('pause not French');
+    await click('#btn-pause-settings');
+    await page.waitForSelector('#overlay-settings:not(.hidden)');
+    const choice = page.locator('[data-game-language="choice"]');
+    await choice.waitFor({ state: 'attached', timeout: 5000 });
+    if ((await choice.count()) !== 1) throw new Error('expected exactly one language selector');
+    await choice.scrollIntoViewIfNeeded();
+    const auto = await choice.locator('option').first().textContent();
+    if (auto !== 'Automatique — Français (Canada)') throw new Error('Automatic label not resolved: ' + auto);
+    await choice.selectOption('it-IT');
+    await page.waitForFunction(() => document.documentElement.lang === 'it-IT'
+      && document.getElementById('settings-h').textContent === 'Impostazioni'
+      && /^Obiettivo: raggiungi il nucleo/.test(document.getElementById('hud-objective').textContent)
+      && document.getElementById('btn-hold').textContent === 'TIENI PER TUFFARTI'
+      && document.getElementById('gfx-h').textContent === 'Grafica');
+    await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]')?.textContent || ''));
+    if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+    const report = page.locator('[data-game-report="title"]');
+    await report.scrollIntoViewIfNeeded();
+    await report.fill('Test report');
+    await click('[data-game-report="send"]');
+    await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+    const spill = await page.evaluate(() => {
+      const w = document.documentElement.clientWidth;
+      return [...document.querySelectorAll('#overlay-settings select, #overlay-settings input, #overlay-settings button, #overlay-settings textarea')]
+        .filter((n) => n.offsetParent && n.getBoundingClientRect().right > w + 1).map((n) => n.outerHTML.slice(0, 60));
+    });
+    if (spill.length) throw new Error('settings controls cut off: ' + spill.join(','));
+    await page.screenshot({ path: SHOT('language', tag) });
+    await choice.selectOption('auto');
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA' && document.getElementById('settings-h').textContent === 'Paramètres');
+    await page.locator('#btn-settings-close').scrollIntoViewIfNeeded();
+    await click('#btn-settings-close');
+    await page.waitForSelector('#overlay-settings.hidden', { state: 'attached' });
+    if ((await page.textContent('#pause-h')) !== 'En pause') throw new Error('pause overlay not re-rendered');
+    if ((await page.textContent('#hud-depth')) !== depth) throw new Error('round changed during the language switch');
+    await click('#btn-resume');
+    console.log(`ok - [${tag}] Language: Automatic follows the StarHermit preference; live switch mid-round; ui.language; report a problem`);
+    if (errors.length) throw new Error('page errors:\n' + errors.join('\n'));
+  } finally {
+    await context.close();
+  }
+}
+
 try {
   await runPass('desktop', { viewport: { width: 1280, height: 800 } }, 'keyboard');
   console.log('ok - desktop pass complete');
@@ -399,7 +474,9 @@ try {
   console.log('ok - mobile pass complete');
   await platformPass('platform-desktop', { viewport: { width: 1280, height: 800 } });
   await platformPass('platform-mobile', { viewport: { width: 390, height: 844 }, hasTouch: true });
-  console.log('\nE2E PASS — core-breaker playable end-to-end on desktop and mobile, no page errors');
+  await languagePass('language-desktop', { viewport: { width: 1280, height: 800 } });
+  await languagePass('language-mobile', { viewport: { width: 390, height: 844 }, hasTouch: true });
+  console.log('\nE2E PASS — core-breaker playable end-to-end on desktop and mobile (incl. language/report), no page errors');
 } finally {
   await browser.close();
   server.close();

@@ -80,6 +80,42 @@
     } catch (e) { return false; }
   }
 
+  // Cloud-save conflict (another device saved first): merge the newer cloud doc
+  // into the live one so neither device loses anything — per stage the higher
+  // stars and best, the higher best per board, every daily (better score, won on
+  // either), lesson and achievement (earliest unlock), the larger totals; this
+  // device's settings and last replay. Saves the merge (mirrored to the cloud).
+  function mergeWrapped(wrapped) {
+    var d = null;
+    try {
+      var wrap = wrapped ? JSON.parse(wrapped) : null;
+      if (wrap && wrap.v === DOC_VERSION && checksum(wrap.data) === wrap.sum) d = wrap.data;
+    } catch (e) { d = null; }
+    if (d) {
+      var k;
+      for (k in d.journey || {}) {
+        var a = doc.journey[k], b = d.journey[k];
+        doc.journey[k] = !a ? b : { stars: Math.max(a.stars || 0, b.stars || 0), best: Math.max(a.best || 0, b.best || 0) };
+      }
+      for (k in d.bests || {}) {
+        if (!doc.bests[k] || (d.bests[k] && d.bests[k].score > doc.bests[k].score)) doc.bests[k] = d.bests[k];
+      }
+      for (k in d.dailies || {}) {
+        var x = doc.dailies[k], y = d.dailies[k];
+        doc.dailies[k] = !x ? y : { score: Math.max(x.score || 0, y.score || 0), won: !!(x.won || y.won) };
+      }
+      for (k in d.tutorialDone || {}) if (d.tutorialDone[k]) doc.tutorialDone[k] = true;
+      for (k in d.achievements || {}) {
+        doc.achievements[k] = doc.achievements[k] ? Math.min(doc.achievements[k], d.achievements[k]) : d.achievements[k];
+      }
+      var t = d.totals || {};
+      ['breaks', 'rounds', 'wins'].forEach(function (n) { doc.totals[n] = Math.max(doc.totals[n] || 0, t[n] || 0); });
+      if (!doc.lastReplay && d.lastReplay) doc.lastReplay = d.lastReplay;
+    }
+    save();
+    return !!d;
+  }
+
   load();
 
   // ---------- settings ----------
@@ -174,6 +210,6 @@
     hasAchievement: hasAchievement, unlockAchievement: unlockAchievement,
     addTotals: addTotals, getTotals: getTotals,
     saveReplay: saveReplay, getReplay: getReplay,
-    importWrapped: importWrapped
+    importWrapped: importWrapped, mergeWrapped: mergeWrapped
   };
 })();

@@ -20,9 +20,15 @@
   var hosted = false;
   var profile = null;          // { name } for the signed-in player
   var sync = 'offline';        // offline | saving | synced (cloud mirror)
-  var syncListeners = [], authListeners = [];
+  var syncListeners = [], authListeners = [], conflictListeners = [];
   var started = false;
 
+
+  // Player-facing fallbacks follow the game language (js/i18n.js) when loaded.
+  function tr(key, vars) {
+    if (root.CBI18N) return root.CBI18N.T(key, vars);
+    return String(key).replace(/\{(\w+)\}/g, function (m, k) { return vars && k in vars ? String(vars[k]) : m; });
+  }
   function sdk() { return SH || (SH = root.StarHermit || null); }
 
   function setSync(state) {
@@ -45,7 +51,7 @@
   function profileFor(pid) {
     var s = sdk();
     if (!s || !hosted || !pid) return Promise.resolve('player');
-    return s.profile(pid).then(function (p) { return p ? p.displayName : 'Player ' + String(pid).slice(0, 6); });
+    return s.profile(pid).then(function (p) { return p ? p.displayName : tr('Player {id}', { id: String(pid).slice(0, 6) }); });
   }
   function fetchProfile() {
     var s = sdk();
@@ -106,7 +112,7 @@
       return Promise.all(raw.slice(0, 20).map(function (e) {
         var uid = String(e.userId != null ? e.userId : e.playerId || '');
         return profileFor(uid).then(function (name) {
-          return { name: uid === s.userId ? 'You (' + name + ')' : name, score: e.score != null ? e.score : e.value };
+          return { name: uid === s.userId ? tr('You ({name})', { name: name }) : name, score: e.score != null ? e.score : e.value };
         });
       }));
     }).catch(function () { return null; });
@@ -131,6 +137,17 @@
       started = true;
       s.init();
       s.on('saved', function (ok) { if (hosted) setSync(ok ? 'synced' : 'offline'); });
+      // Another device saved since our last load: the SDK refused this write and
+      // blocks further ones until a reload. Reload the cloud copy and hand it to
+      // the game (onConflict) to merge and save again.
+      s.on('saveconflict', function () {
+        setSync('saving');
+        s.loadJSON().then(function (obj) {
+          if (s.saveConflicted()) { setSync('offline'); return; }
+          var raw = obj ? JSON.stringify(obj) : null;
+          conflictListeners.forEach(function (fn) { try { fn(raw); } catch (e) { /* ignore */ } });
+        });
+      });
       s.on('auth', function (a) {
         var was = hosted;
         hosted = !!(a && a.signedIn && s.slug);
@@ -179,6 +196,8 @@
     inviteLink: function () { var s = sdk(); return s && hosted ? s.inviteLink() : null; },
     onSync: function (fn) { if (typeof fn === 'function') syncListeners.push(fn); },
     onAuth: function (fn) { if (typeof fn === 'function') authListeners.push(fn); },
+    /** fn(remoteWrapped|null) after a save conflict: the newer cloud copy, reloaded (writes allowed again). */
+    onConflict: function (fn) { if (typeof fn === 'function') conflictListeners.push(fn); },
     get hosted() { return hosted; },
     get profile() { return profile; },
     get sync() { return sync; },

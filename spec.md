@@ -30,13 +30,15 @@
 | `js/gfx.js` | `CBGfx` (UMD, pure): graphics presets, per-category overrides, GPU detection, `resolve`/`presetTier`/`describe`, Graphics-panel strings in nine locales |
 | `js/render.js` | `CBRender`: Three.js scene, windowed segment mesh pool, striker, charge pips, particles, shaft surround, camera drift/shake, graphics settings, post-processing chain, adaptive resolution |
 | `js/main.js` | UI shell: screens, overlays, settings, input, play lifecycle, HUD, results, achievements, signed-in server-time sync |
+| `js/i18n.js`, `js/strings.js` | Localization: `window.CBI18N` (`T()`, current `lang`, the `sh-language.js` instance, static-markup translation) and the nine-locale tables keyed by the English source strings |
+| `sh-language.js` | Shared StarHermit language preference (`window.StarHermitLanguage`), an unmodified copy of `tools/sh-language.js` |
 | `score-script.js` | StarHermit platform script (`server=`): range-checks a finished Score Chase total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local dev server plus legacy `/api/v1` routes: time, daily metadata, leaderboard, replay-validated score submit |
 | `starhermit.txt` | Platform manifest (`name`, `launch`, `owner`, `server=score-script.js`, `version`, `contentVersion`, `cover`) |
 | `sfx/` | 16 Opus clips, `manifest.txt` (canonical binding list), `manifest.json` (generator input), `manifest.md` |
 | `assets/` | `key-art.webp` (title backdrop), `core-reached.webp` / `dive-over.webp` (results illustrations) |
 | `coverart.png`, `icon.png`, `favicon.svg` | Store cover (1200×675), 256 px icon, SVG favicon |
-| `tests/run_tests.js`, `tests/gfx.test.js`, `tests/platform.test.mjs`, `tests/e2e.mjs` | `npm test` rules/content/server suite plus the `node --test` graphics-model and StarHermit-adapter suites; Playwright playthrough at desktop and mobile viewports |
+| `tests/run_tests.js`, `tests/gfx.test.js`, `tests/platform.test.mjs`, `tests/i18n.test.mjs`, `tests/e2e.mjs` | `npm test` rules/content/server suite plus the `node --test` graphics-model, StarHermit-adapter/save-merge and localization suites; Playwright playthrough at desktop and mobile viewports |
 | `tests/browser_smoke.js` | Legacy CDP smoke script (not part of `npm test`) |
 | `tools/` | Dev-only; `scores.json` is written here by the server at runtime |
 | `vendor/three.module.min.js` | Three.js r160 (MIT), mapped as `three` by the page's import map |
@@ -190,7 +192,13 @@ High-contrast variants (`safeHC`/`armorHC`) are saturated Open-Color hues so saf
 
 ## 10. Localization
 
-Shipped language: **English (en-US)** only, except the Settings → Graphics section, whose strings (`js/gfx.js STRINGS`) exist in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT and follow `navigator.languages` (language fallbacks: es → es-419, fr → fr-FR, pt → pt-BR, else en-US). Other strings live as literals in `index.html` (static labels) and `js/main.js` (dynamic HUD, results, hints, help, announcements) and `js/content.js` (stage names, intros, lesson text, achievement names). There is no language selector and no locale detection; `toLocaleString('en-US')` formats scores and `toLocaleDateString()` formats board dates. Layout allowances that already exist for longer strings: buttons wrap in `.menu-row`, cards scroll, HUD stats wrap onto a second row. See "Design intent not yet implemented" for the required nine-locale set.
+Nine locales ship: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**; `<html lang>` is set to the resolved tag.
+
+- **Strings.** English source strings are the keys; `js/strings.js` holds the tables (es-419, de-DE, fr-FR, pt-BR, it-IT in full; en-GB derived with British spelling — armour, colour; es-ES and fr-CA list only their differences, e.g. fr-CA *pointage*). `js/i18n.js` translates the static markup in place (HUD labels, title menu, screens, overlays, settings; the logo and the Graphics labels owned by `js/gfx.js` are skipped) and `js/main.js` builds every other string through `T()`: title progress, journey grid labels, practice and challenge lists, daily and score screens, the intro dialog, HUD objective, hint pill, hold button, announcements, toasts, results with breakdown and progress lines, help cards and key names, theme options and sound captions. Content stays English and is translated at display time: stage names and intros, challenges, practice presets, the endless shaft, lessons, themes and achievements. The Graphics section (`js/gfx.js` strings) and the StarHermit strings follow the same language. "Core Breaker" and "StarHermit" stay as they are; scores keep `toLocaleString('en-US')` digits.
+- **Language setting.** Settings → Graphics carries the shared **Language → Game language** selector (rendered by `game-options.js` from the `sh-language.js` instance) — reachable from the title and the pause menu: **Automatic — <resolved language>** plus the nine locales by native name, with a status line (Saved to account / Saved on this device / Account sync unavailable). It is the only language selector.
+- **Resolution** (`sh-language.js`): explicit game choice → for Automatic, the StarHermit account's `preferredLanguage` (`GET /api/v1/me/language`, signed in only) → `navigator.languages` → en-US; tags map to the nearest shipped locale (es-MX → es-419, en-AU → en-GB, fr → fr-FR). The choice (`auto` or a locale) is stored per player in `localStorage['core-breaker.language.<user|guest>']` and, signed in, in the per-player settings key `ui.language` as `{ choice }`; a failed settings read never overwrites it and the game never writes the platform preference. Unsigned play makes no language requests. `?lang=<tag>` forces a locale for the page load (QA links) and hides the selector.
+- **Live switching.** On the `cb-language` event the static markup is re-translated and `onLanguage()` re-renders code-built text in place (Graphics labels, account line, title, lists, open screens and dialogs, HUD objective and hold button, results without re-posting the leaderboard line). The dive, its clock and the shaft are untouched; a paused dive stays paused.
+- **Expansion.** Buttons wrap in `.menu-row`, cards scroll, HUD stats wrap onto a second row; the hold button wraps to two lines in German at 390 px.
 
 ## 11. Accessibility
 
@@ -215,15 +223,17 @@ All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/
 | Launch token / renewal | `StarHermit.init()` reads `#game_token=` (library) or `#access_token=` (sign-in return), strips it, takes the slug from `game_scope` and renews before expiry. If renewal is refused the title returns to the offline line and sign-in button; play continues locally |
 | Sign-in | On `*.starhermit.com` without a token the title shows "Sign in with StarHermit" (`StarHermit.signIn()`); hidden when signed in or running locally |
 | Identity / profile | The title shows "Playing as <nickname> · sync status" from `StarHermit.profile()` (nickname, `Player <id>` fallback) |
-| Cloud save | The checksummed session doc is mirrored with `StarHermit.saveJSON` (2 s debounce) to `/api/v1/me/cloud-saves/game:<slug>`, flushed with keepalive on `pagehide`/hidden. Remote wins on boot (`loadJSON` → `CBSession.importWrapped` validates version + checksum); localStorage stays the offline cache |
+| Cloud save | The checksummed session doc is mirrored with `StarHermit.saveJSON` (2 s debounce) to `/api/v1/me/cloud-saves/game:<slug>`, flushed with keepalive on `pagehide`/hidden. Remote wins on boot (`loadJSON` → `CBSession.importWrapped` validates version + checksum); localStorage stays the offline cache. Writes after a load are conditional: when another device saved first the SDK emits `saveconflict`, `platform.js` reloads the cloud doc and `CBSession.mergeWrapped` merges it into the live doc (higher stars and best per stage, higher best per board, every daily with the better score, every lesson and achievement at its earliest unlock, the larger totals; this device's settings and last replay) and saves the merge |
 | Settings KV | Every `CBSession.setSetting` (volumes, mute, captions, graphics preset + overrides, reduced motion, high contrast, large text, left-handed, hold toggle, timing assist, theme) is mirrored with `patchSettings` (400 ms debounce). On boot `getSettings()` is applied over the local doc (platform wins) |
 | Invite link | When signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked) |
 | Controls | Keydown/keyup are routed by `event.code` through `StarHermit.loadBindings(defaults)`; How to Play lists the effective keys. No in-game rebinding UI |
 | Leaderboards | When signed in, every finished Score Chase dive posts its total through `StarHermit.submitScores({ 'high-score': total })` to the platform `high-score` board (integer, higher is better, 0–10,000,000); the results card shows "Posting score to the leaderboard…", then "Leaderboard rank: #N" (or "Score posted to the leaderboard." / "Score not posted to the leaderboard."), in all nine locales. Other modes post nothing; standalone posts nothing and shows no line. Local boards stay on the device; nothing is submitted to the own server. When signed in, Score Chase also reads the platform board with `StarHermit.leaderboard()` (nicknames resolved, own row marked) above the local board |
+| Reports | Signed in, Settings → **Report a problem** (from `game-options.js`) files a bug report through `StarHermit.reportBug` with a small `context.json` (viewport, language, FPS cap, audio limit); uncaught errors are filed as crash reports through `StarHermit.captureCrashes` (SDK-capped) |
+| Language | Automatic follows the account's preferred language; an explicit choice syncs to the settings key `ui.language` (§10) |
 | Achievements | Local only (part of the cloud-saved doc); the game's server reports no platform achievements |
 | Matchmaking, invites to sessions, chat, replays, voice, realtime | Not used: solo game; the only platform session is the short practice session that posts a Score Chase result |
 
-New platform strings (account line, sign-in, invite, toast, leaderboard result) are localized in the nine supported locales via `Gfx.pickLocale`. Without a token the game makes no StarHermit calls; it stays fully playable with the server unreachable or from `file:`.
+Platform strings (account line, sign-in, invite, toast, leaderboard result) are localized in the nine supported locales and follow the game language. Without a token the game makes no StarHermit calls; it stays fully playable with the server unreachable or from `file:`.
 
 ## 13. Technical architecture
 
@@ -241,7 +251,7 @@ New platform strings (account line, sign-in, invite, toast, leaderboard result) 
 
 `tests/gfx.test.js` (`node --test`, part of `npm test`): `detectPreset` on sample GPU strings, mobile cap, `resolve` with preset / override / invalid tier / scale clamp, preset choice clears overrides, `presetTier`/`describe`, every locale has every string, locale picking.
 
-`tests/platform.test.mjs` (`node --test`, part of `npm test`) loads the SDK and `js/platform.js` in a vm sandbox with a stubbed `fetch` and launch hash: token read and fragment strip, profile nickname, `game:<slug>` cloud-save round-trip, settings patch, binding overrides, invite link, platform leaderboard rows, and no fetch at all when standalone. `tests/e2e.mjs` additionally fails if a standalone pass calls a StarHermit route, and runs a signed-in pass on both viewports (stubbed platform API): nickname shown, save loaded from `game:core-breaker`, fragment stripped, platform setting (large text) applied, Invite a friend toast, How to Play lists the platform binding, Score Chase shows the platform board.
+`tests/platform.test.mjs` (`node --test`, part of `npm test`) loads the SDK and `js/platform.js` in a vm sandbox with a stubbed `fetch` and launch hash: token read and fragment strip, profile nickname, `game:<slug>` cloud-save round-trip, settings patch, binding overrides, invite link, platform leaderboard rows, no fetch at all when standalone, the save-conflict merge rules (session in a vm sandbox) and a refused write → reload round trip. `tests/i18n.test.mjs` checks every key used in markup, `main.js`, `platform.js`, audio captions and content exists in all nine locales with intact placeholders, and that the language follows `sh-language.js` and switches live. `tests/e2e.mjs` additionally fails if a standalone pass calls a StarHermit route, and runs a signed-in pass on both viewports (stubbed platform API): nickname shown, save loaded from `game:core-breaker`, fragment stripped, platform setting (large text) applied, Invite a friend toast, How to Play lists the platform binding, Score Chase shows the platform board; then a language pass on both viewports (`tests/starhermit-e2e.mjs` stub, account prefers fr-CA): Automatic resolves to Canadian French, Journey stage 1 is started in French and paused, Settings → Language switches to Italian (settings heading, HUD objective, hold button and Graphics heading re-render in place; `ui.language` is PUT), Report a problem posts a bug report, Automatic returns to French and closing Settings shows the paused dive at the same depth.
 
 `tests/e2e.mjs` (desktop 1280×800 keyboard, mobile 390×844 touch): title loads without the WebGL compat note; settings apply high contrast/reduced motion/Balanced quality; Graphics: Auto label shows the detected tier, Low then High change `data-gfx-preset` and the summary, a Bloom override and Show frame rate apply, all three survive a reload, choosing Low clears the override; help shows ≥ 3 cards; Learn opens lesson 1; journey grid has 40 stages with 1 unlocked; stage 1 is won with a 7-row breakdown; stars persist; stage 2 undo rewinds depth exactly, pause → settings → resume → win; Practice Calm reaches results by hint-driven dodging; Daily and Score screens render; hold button ≥ 44 px; zero console errors/warnings and page errors.
 
@@ -263,7 +273,6 @@ New platform strings (account line, sign-in, invite, toast, leaderboard result) 
 
 ## 16. Known limitations
 
-- English only; no locale switching (see intent below).
 - Own-server leaderboards are not used; the signed-in Score Chase posts to and shows the platform leaderboard.
 - The HUD "Best" in Journey is the best across all stages, not the current stage.
 - Achievements never leave the device.
@@ -274,7 +283,6 @@ New platform strings (account line, sign-in, invite, toast, leaderboard result) 
 
 ## Design intent not yet implemented
 
-- Localization for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT with a string table and language selection from the platform locale.
 - Shared cross-player leaderboards (global and friends-filtered) on the Score Chase, Daily and Challenge screens, beyond the platform board.
 - Delivering achievements through the platform.
 - Per-stage HUD best in Journey and per-date daily boards.

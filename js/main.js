@@ -14,6 +14,24 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  // ---------- localization (js/i18n.js: window.CBI18N) ----------
+  // English source strings are the keys. T() translates now; N() only marks a
+  // string for translation at display time. Content data stays English.
+  function T(key, vars) {
+    if (window.CBI18N) return window.CBI18N.T(key, vars);
+    return String(key).replace(/\{(\w+)\}/g, function (m, k) { return vars && k in vars ? String(vars[k]) : m; });
+  }
+  function N(key) { return key; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function curLangs() { return window.CBI18N && window.CBI18N.lang ? [window.CBI18N.lang] : (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]); }
+  // Display name of a round configuration in the current language.
+  function cfgName(cfg, kind) {
+    if (!cfg) return '';
+    if (cfg.kind === 'daily' && cfg.date) return T('Daily {date}', { date: cfg.date });
+    if (cfg.practiceName) return T('Practice — {name}', { name: T(cfg.practiceName) });
+    return cfg.name ? T(cfg.name) : (kind || '');
+  }
+
   // ---------- formatting ----------
 
   function fmtTime(ms) {
@@ -53,7 +71,8 @@
   function caption(text) {
     if (!Session.getSetting('captions')) return;
     var el = $('caption-bar');
-    el.textContent = '♪ ' + text;
+    var m = /^crystal break ×(\d+)$/.exec(text);
+    el.textContent = '♪ ' + (m ? T('crystal break ×{n}', { n: m[1] }) : T(text));
     clearTimeout(captionTimer);
     captionTimer = setTimeout(function () { el.textContent = ''; }, 1400);
   }
@@ -69,7 +88,7 @@
     'pt-BR': { offline: 'Offline — o progresso fica salvo neste dispositivo.', playing: 'Jogando como {name}', synced: 'progresso sincronizado', saving: 'salvando…', nosync: 'sincronização na nuvem indisponível', signIn: 'Entrar com StarHermit', invite: 'Convidar um amigo', copied: 'Link de convite copiado para a área de transferência.', copyFail: 'Não foi possível copiar — link de convite: {link}', lbPosting: 'Enviando a pontuação para o ranking…', lbRank: 'Posição no ranking: #{rank}', lbPosted: 'Pontuação enviada para o ranking.', lbNotPosted: 'A pontuação não foi enviada para o ranking.' },
     'it-IT': { offline: 'Offline: i progressi sono salvati su questo dispositivo.', playing: 'Giochi come {name}', synced: 'progressi sincronizzati', saving: 'salvataggio…', nosync: 'sincronizzazione cloud non disponibile', signIn: 'Accedi con StarHermit', invite: 'Invita un amico', copied: 'Link di invito copiato negli appunti.', copyFail: 'Impossibile copiare. Link di invito: {link}', lbPosting: 'Invio del punteggio alla classifica…', lbRank: 'Posizione in classifica: #{rank}', lbPosted: 'Punteggio inviato alla classifica.', lbNotPosted: 'Punteggio non inviato alla classifica.' }
   };
-  var P_STR = PT[Gfx.pickLocale(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language])] || PT['en-US'];
+  var P_STR = PT[Gfx.pickLocale(curLangs())] || PT['en-US']; // follows the game language
 
   // ---------- key bindings (platform overrides via StarHermit controls) ----------
   var DEFAULT_KEYS = { dive: ['Space'], toggle: ['Enter'], pause: ['KeyP'], undo: ['KeyU'], retry: ['KeyR'], back: ['Escape'] };
@@ -80,7 +99,12 @@
   }
   setBindings(DEFAULT_KEYS);
   function keyName(code) {
-    return String(code).replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow(.*)$/, '$1 arrow').replace(/^Escape$/, 'Escape');
+    var arrow = /^Arrow(.*)$/.exec(code);
+    if (arrow) return T('{dir} arrow', { dir: T({ Up: N('Up'), Down: N('Down'), Left: N('Left'), Right: N('Right') }[arrow[1]] || arrow[1]) });
+    if (code === 'Space') return T('Space');
+    if (code === 'Enter') return T('Enter');
+    if (code === 'Escape') return T('Escape');
+    return String(code).replace(/^Key/, '').replace(/^Digit/, '');
   }
   function keysFor(action) { return (bindings[action] || []).map(keyName).join(' / '); }
 
@@ -188,7 +212,7 @@
 
   // ---------- graphics settings (quality model in js/gfx.js) ----------
 
-  var gfxStr = Gfx.strings(Gfx.pickLocale(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]));
+  var gfxStr = Gfx.strings(Gfx.pickLocale(curLangs()));
 
   // Saved graphics = the `quality` preset plus the `gfx` overrides object in the settings doc.
   function savedGfx() {
@@ -303,8 +327,8 @@
       for (var i = 0; i < Content.ACHIEVEMENTS.length; i++)
         if (Content.ACHIEVEMENTS[i].key === key) meta = Content.ACHIEVEMENTS[i];
       if (meta) {
-        toast('Achievement: ' + meta.name);
-        announce('Achievement unlocked: ' + meta.name + '. ' + meta.desc);
+        toast(T('Achievement: {name}', { name: T(meta.name) }));
+        announce(T('Achievement unlocked: {name}. {desc}', { name: T(meta.name), desc: T(meta.desc) }));
         Audio.sfxAchievement();
       }
     }
@@ -335,8 +359,8 @@
     var stars = Session.totalStars();
     var unlocked = Content.THEMES.filter(function (th) { return th.unlockStars <= stars; }).length;
     $('title-progress').textContent = t.rounds === 0
-      ? 'New pilot — start with the Learn lessons or jump into Journey.'
-      : 'Stars ' + stars + ' · Rounds ' + t.rounds + ' · Cores ' + t.wins + ' · Themes ' + unlocked + '/' + Content.THEMES.length;
+      ? T('New pilot — start with the Learn lessons or jump into Journey.')
+      : T('Stars {stars} · Rounds {rounds} · Cores {wins} · Themes {themes}/{total}', { stars: stars, rounds: t.rounds, wins: t.wins, themes: unlocked, total: Content.THEMES.length });
   }
 
   function renderJourneyGrid() {
@@ -352,9 +376,9 @@
       var stars = rec ? rec.stars : 0;
       b.innerHTML = '<span>' + (idx + 1) + '</span><span class="stars">' +
         (stars === 2 ? '★★' : stars === 1 ? '★' : (prevDone ? '·' : '🔒')) + '</span>';
-      b.setAttribute('aria-label', 'Stage ' + (idx + 1) + ': ' + lv.name +
-        (b.disabled ? ' (locked)' : '') + (stars ? ', ' + stars + ' stars' : ''));
-      b.title = lv.name;
+      b.setAttribute('aria-label', T('Stage {n}: {name}', { n: idx + 1, name: T(lv.name) }) +
+        (b.disabled ? ' ' + T('(locked)') : '') + (stars ? ', ' + T(stars === 1 ? '{n} star' : '{n} stars', { n: stars }) : ''));
+      b.title = T(lv.name);
       b.addEventListener('click', function () { openIntro(lv, 'journey', { levelIndex: idx }); });
       grid.appendChild(b);
       prevDone = !!(rec && rec.stars > 0);
@@ -368,14 +392,15 @@
       var b = document.createElement('button');
       b.type = 'button';
       var best = Session.getBest('practice-' + p.id);
-      b.innerHTML = '<strong>' + p.name + '</strong><span class="small">' +
-        p.layers + ' layers · ' + p.sectors + ' sectors · armor ' + Math.round(p.armorPct * 100) + '%' +
-        (best != null ? ' · best ' + fmtScore(best) : '') + '</span>';
+      b.innerHTML = '<strong>' + esc(T(p.name)) + '</strong><span class="small">' +
+        esc(T('{layers} layers · {sectors} sectors · armor {armor}%', { layers: p.layers, sectors: p.sectors, armor: Math.round(p.armorPct * 100) }) +
+        (best != null ? ' · ' + T('best {score}', { score: fmtScore(best) }) : '')) + '</span>';
       b.addEventListener('click', function () {
         var cfg = Rules.clone(p);
         cfg.theme = Session.getSetting('theme') || 'void';
         cfg.seed = (Math.floor(Math.random() * 0xffffffff)) >>> 0; // fresh practice shaft each run
         cfg.name = 'Practice — ' + p.name;
+        cfg.practiceName = p.name; // display: T('Practice — {name}')
         openIntro(cfg, 'practice', {});
       });
       list.appendChild(b);
@@ -389,8 +414,8 @@
       var b = document.createElement('button');
       b.type = 'button';
       var best = Session.getBest('challenge-' + c.id);
-      b.innerHTML = '<strong>' + c.name + '</strong><span class="small">' + c.intro +
-        (best != null ? ' · best ' + fmtScore(best) : '') + '</span>';
+      b.innerHTML = '<strong>' + esc(T(c.name)) + '</strong><span class="small">' + esc(T(c.intro) +
+        (best != null ? ' · ' + T('best {score}', { score: fmtScore(best) }) : '')) + '</span>';
       b.addEventListener('click', function () { openIntro(c, 'challenge', {}); });
       list.appendChild(b);
     });
@@ -403,14 +428,13 @@
   function renderDailyScreen() {
     var dateStr = Content.utcDateString(dailyNow());
     var cfg = Content.dailyConfig(dateStr);
-    $('daily-info').textContent = dateStr + ' · ' + cfg.layers + ' layers · armor ' +
-      Math.round(cfg.armorPct * 100) + '% · rotation ' + cfg.rotSpeed +
-      (cfg.timeLimitSec ? ' · ' + cfg.timeLimitSec + 's containment timer' : '') +
-      ' · par ' + cfg.par.timeSec + 's';
+    $('daily-info').textContent = dateStr + ' · ' + T('{layers} layers · armor {armor}% · rotation {rot}', { layers: cfg.layers, armor: Math.round(cfg.armorPct * 100), rot: cfg.rotSpeed }) +
+      (cfg.timeLimitSec ? ' · ' + T('{n}s containment timer', { n: cfg.timeLimitSec }) : '') +
+      ' · ' + T('par {n}s', { n: cfg.par.timeSec });
     var d = Session.getDaily(dateStr);
     $('daily-status').textContent = d
-      ? 'Completed today: ' + (d.won ? 'core reached' : 'attempt logged') + ', best ' + fmtScore(d.score) + '. You can improve your score.'
-      : 'Not attempted yet today. One shared seed for everyone.';
+      ? T(d.won ? 'Completed today: core reached, best {score}. You can improve your score.' : 'Completed today: attempt logged, best {score}. You can improve your score.', { score: fmtScore(d.score) })
+      : T('Not attempted yet today. One shared seed for everyone.');
     updateDailyCountdown();
   }
 
@@ -423,8 +447,8 @@
       var next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
       var left = next - now;
       var h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000), s = Math.floor(left % 60000 / 1000);
-      $('daily-countdown').textContent = 'Next daily in ' + h + 'h ' + m + 'm ' + s + 's' +
-        (serverOffsetMs == null ? ' (local clock)' : ' (server time)');
+      $('daily-countdown').textContent = T('Next daily in {h}h {m}m {s}s', { h: h, m: m, s: s }) + ' ' +
+        (serverOffsetMs == null ? T('(local clock)') : T('(server time)'));
     };
     tick();
     dailyCdTimer = setInterval(tick, 1000);
@@ -442,7 +466,7 @@
       P.fetchLeaderboard().then(function (entries) {
         if (!entries || !entries.length) return;
         var h = document.createElement('li');
-        h.textContent = '— platform board —';
+        h.textContent = T('— platform board —');
         h.className = 'small';
         board.appendChild(h);
         entries.slice(0, 10).forEach(function (e, i) {
@@ -451,19 +475,19 @@
           board.appendChild(li);
         });
         var sep = document.createElement('li');
-        sep.textContent = '— this device —';
+        sep.textContent = T('— this device —');
         sep.className = 'small';
         board.appendChild(sep);
       }).catch(function () {});
     }
     local.slice(0, 10).forEach(function (row) {
       var li = document.createElement('li');
-      li.textContent = fmtScore(row.score) + ' — depth ' + row.depth + ' (' + new Date(row.atMs).toLocaleDateString() + ')';
+      li.textContent = fmtScore(row.score) + ' — ' + T('depth {n}', { n: row.depth }) + ' (' + new Date(row.atMs).toLocaleDateString(window.CBI18N ? window.CBI18N.lang : undefined) + ')';
       board.appendChild(li);
     });
     if (!local.length && !(P && P.hosted)) {
       var li = document.createElement('li');
-      li.textContent = 'No dives yet. Yours will appear here; hosted boards compare with friends.';
+      li.textContent = T('No dives yet. Yours will appear here; hosted boards compare with friends.');
       board.appendChild(li);
     }
   }
@@ -472,17 +496,23 @@
 
   function openIntro(cfg, kind, ctx) {
     playCfg = cfg; playKind = kind; playCtx = ctx;
-    $('intro-h').textContent = cfg.name || kind;
-    $('intro-text').textContent = ctx.lesson ? ctx.lesson.text : (cfg.intro || 'Reach the core at the bottom of the shaft.');
-    var meta = [cfg.layers + ' layers', cfg.sectors + ' sectors'];
-    if (cfg.timeLimitSec) meta.push(cfg.timeLimitSec + 's timer');
-    if (cfg.chargeMax) meta.push('charge cell ×' + cfg.chargeMax); else meta.push('no charge cell');
-    meta.push(cfg.mechanics.undo ? 'undo on' : 'no undo');
-    meta.push(cfg.mechanics.hint ? 'hints on' : 'no hints');
-    meta.push(kind === 'tutorial' ? 'unranked'
-      : kind === 'practice' ? 'local best only' : 'ranked locally');
-    $('intro-meta').textContent = meta.join(' · ');
+    renderIntro();
     openOverlay('overlay-intro');
+  }
+  // Intro dialog text for the pending round (re-run on a language change).
+  function renderIntro() {
+    var cfg = playCfg, kind = playKind, ctx = playCtx || {};
+    if (!cfg) return;
+    $('intro-h').textContent = ctx.lesson ? T(ctx.lesson.title) : cfgName(cfg, kind);
+    $('intro-text').textContent = ctx.lesson ? T(ctx.lesson.text) : (cfg.intro ? T(cfg.intro) : T('Reach the core at the bottom of the shaft.'));
+    var meta = [T('{n} layers', { n: cfg.layers }), T('{n} sectors', { n: cfg.sectors })];
+    if (cfg.timeLimitSec) meta.push(T('{n}s timer', { n: cfg.timeLimitSec }));
+    if (cfg.chargeMax) meta.push(T('charge cell ×{n}', { n: cfg.chargeMax })); else meta.push(T('no charge cell'));
+    meta.push(cfg.mechanics.undo ? T('undo on') : T('no undo'));
+    meta.push(cfg.mechanics.hint ? T('hints on') : T('no hints'));
+    meta.push(kind === 'tutorial' ? T('unranked')
+      : kind === 'practice' ? T('local best only') : T('ranked locally'));
+    $('intro-meta').textContent = meta.join(' · ');
   }
 
   // ---------- play lifecycle ----------
@@ -495,7 +525,7 @@
     clearInterval(countdownTimer); countdownTimer = null;
     clearTimeout(resultsTimer); resultsTimer = null;
     playState = Rules.createGame(playCfg);
-    playName = playCfg.name || playKind;
+    playName = playCfg.name || playKind; // English (replays); shown via cfgName()
     inputLog = [];
     cmdSeq = 0;
     resultsShown = false;
@@ -506,7 +536,7 @@
     screenStack = ['screen-title'];
     $('hud').classList.remove('hidden');
     $('action-tray').classList.remove('hidden');
-    $('btn-hold').textContent = Session.getSetting('holdToggle') ? 'TAP TO DIVE' : 'HOLD TO DIVE';
+    $('btn-hold').textContent = Session.getSetting('holdToggle') ? T('TAP TO DIVE') : T('HOLD TO DIVE');
     $('hud-objective').textContent = objectiveText();
     $('hud-timer-wrap').style.display = playCfg.timeLimitSec ? '' : 'none';
 
@@ -519,7 +549,7 @@
     // countdown → active
     countingDown = true;
     countdownLeft = 3;
-    announce('Get ready', true);
+    announce(T('Get ready'), true);
     $('hintbar').textContent = '3';
     Audio.sfxCountdown();
     countdownTimer = setInterval(function () {
@@ -532,7 +562,7 @@
         clearInterval(countdownTimer); countdownTimer = null;
         countingDown = false;
         $('hintbar').textContent = '';
-        announce('Dive! ' + objectiveText(), true);
+        announce(T('Dive!') + ' ' + objectiveText(), true);
         startLoops();
       }
     }, 700);
@@ -540,9 +570,9 @@
 
   function objectiveText() {
     if (!playCfg) return '';
-    if (playCfg.endless) return 'Objective: descend as deep as you can. Armor ends the dive.';
-    if (playCfg.timeLimitSec) return 'Objective: reach the core (' + playCfg.layers + ' layers) before containment vents in ' + playCfg.timeLimitSec + 's.';
-    return 'Objective: reach the core — ' + playCfg.layers + ' layers down.';
+    if (playCfg.endless) return T('Objective: descend as deep as you can. Armor ends the dive.');
+    if (playCfg.timeLimitSec) return T('Objective: reach the core ({layers} layers) before containment vents in {n}s.', { layers: playCfg.layers, n: playCfg.timeLimitSec });
+    return T('Objective: reach the core — {layers} layers down.', { layers: playCfg.layers });
   }
 
   function startLoops() {
@@ -583,10 +613,10 @@
           if (playState && playState.charge === playCfg.chargeMax && e.charge === playCfg.chargeMax) Audio.sfxCharge();
           break;
         case 'pass': Audio.sfxPass(); break;
-        case 'overdrive': Audio.sfxOverdrive(); announce('Overdrive! Armored segment smashed.', false); break;
-        case 'crash': Audio.sfxCrash(); announce('Armor impact — dive over.', true); break;
-        case 'win': Audio.sfxWin(); announce('Core reached!', true); break;
-        case 'lose': if (e.reason !== Rules.TERMINAL.ARMOR) { Audio.sfxLose(); announce('Dive over: ' + reasonText(e.reason), true); } break;
+        case 'overdrive': Audio.sfxOverdrive(); announce(T('Overdrive! Armored segment smashed.'), false); break;
+        case 'crash': Audio.sfxCrash(); announce(T('Armor impact — dive over.'), true); break;
+        case 'win': Audio.sfxWin(); announce(T('Core reached!'), true); break;
+        case 'lose': if (e.reason !== Rules.TERMINAL.ARMOR) { Audio.sfxLose(); announce(T('Dive over: {reason}', { reason: reasonText(e.reason) }), true); } break;
       }
       // tutorial lesson goal tracking
       if (playCtx && playCtx.lesson) checkLessonGoal(e);
@@ -600,8 +630,8 @@
       lessonGoalCount++;
       if (lessonGoalCount >= goal.count) {
         Session.markTutorialDone(playCtx.lesson.id);
-        announce('Lesson complete: ' + playCtx.lesson.title, true);
-        toast('Lesson complete: ' + playCtx.lesson.title);
+        announce(T('Lesson complete: {title}', { title: T(playCtx.lesson.title) }), true);
+        toast(T('Lesson complete: {title}', { title: T(playCtx.lesson.title) }));
         Audio.sfxLesson();
       }
     }
@@ -609,10 +639,10 @@
 
   function reasonText(reason) {
     switch (reason) {
-      case Rules.TERMINAL.CORE: return 'core reached';
-      case Rules.TERMINAL.ARMOR: return 'armor impact';
-      case Rules.TERMINAL.TIME: return 'containment vented (time up)';
-      case Rules.TERMINAL.RESIGN: return 'resigned';
+      case Rules.TERMINAL.CORE: return T('core reached');
+      case Rules.TERMINAL.ARMOR: return T('armor impact');
+      case Rules.TERMINAL.TIME: return T('containment vented (time up)');
+      case Rules.TERMINAL.RESIGN: return T('resigned');
       default: return reason;
     }
   }
@@ -630,7 +660,7 @@
       var left = playCfg.timeLimitSec * 1000 - s.elapsedMs;
       $('hud-timer').textContent = fmtTime(Math.max(0, left));
       $('hud-timer').style.color = left < 10000 ? 'var(--danger)' : '';
-      if (left < 10000 && left > 0 && !timerWarned && !s.terminal) { timerWarned = true; Audio.sfxTimerWarn(); announce('Containment vents in 10 seconds.', false); }
+      if (left < 10000 && left > 0 && !timerWarned && !s.terminal) { timerWarned = true; Audio.sfxTimerWarn(); announce(T('Containment vents in 10 seconds.'), false); }
     }
     $('hud-mult').textContent = '×' + s.mult;
     var pips = $('charge-pips');
@@ -644,7 +674,7 @@
       pips.children[i].style.display = i < max ? '' : 'none';
       pips.children[i].classList.toggle('on', i < s.charge);
     }
-    pips.setAttribute('aria-label', 'Charge ' + s.charge + ' of ' + max);
+    pips.setAttribute('aria-label', T('Charge {n} of {max}', { n: s.charge, max: max }));
     var canUndo = Rules.legalActions(s).indexOf('undo') >= 0;
     $('btn-hud-undo').disabled = !canUndo;
     $('btn-tray-undo').disabled = !canUndo;
@@ -662,9 +692,9 @@
     var h = Rules.hint(s);
     if (!h) { bar.textContent = ''; return; }
     var p = h.peek;
-    var seg = p.segment === 0 ? (Session.getSetting('highContrast') ? 'SAFE (bright)' : 'safe crystal')
-      : p.segment === 1 ? (p.chargeReady ? 'armor — OVERDRIVE READY' : 'ARMOR — release!')
-      : 'gap — fall through';
+    var seg = p.segment === 0 ? (Session.getSetting('highContrast') ? T('SAFE (bright)') : T('safe crystal'))
+      : p.segment === 1 ? (p.chargeReady ? T('armor — OVERDRIVE READY') : T('ARMOR — release!'))
+      : T('gap — fall through');
     var assist = Session.getSetting('timingAssist');
     var ms = assist ? Math.max(0, p.ms - 100) : p.ms;
     bar.textContent = seg + ' · ' + (ms < 500 ? '<0.5s' : (ms / 1000).toFixed(1) + 's');
@@ -710,11 +740,11 @@
     if (!playState || paused || countingDown || anyOverlayOpen()) return;
     var cmd = { type: 'undo', atTick: playState.tick, id: 'c' + (++cmdSeq) };
     var r = Rules.applyCommand(playState, cmd);
-    if (!r.ok) { announce('Nothing to undo.', false); return; }
+    if (!r.ok) { announce(T('Nothing to undo.'), false); return; }
     playState = r.state;
     inputLog.push(cmd);
     Audio.sfxUndo();
-    announce('Rewound to your last release.', false);
+    announce(T('Rewound to your last release.'), false);
     handleEvents(r.events);
     updateHUD();
   }
@@ -799,12 +829,12 @@
     if (!playState || playState.terminal) return;
     paused = true;
     openOverlay('overlay-pause');
-    announce('Paused', false);
+    announce(T('Paused'), false);
   }
   function resumeGame() {
     paused = false;
     closeOverlay('overlay-pause');
-    announce('Resumed', false);
+    announce(T('Resumed'), false);
   }
   function quitToTitle() {
     stopLoops();
@@ -887,45 +917,9 @@
     };
     Session.saveReplay(replay);
 
-    $('res-headline').textContent = won ? 'Core Reached!' : 'Dive Over';
-    $('res-reason').textContent = playName + ' — ' + reasonText(t.reason) +
-      ' · time ' + fmtTime(s.elapsedMs) + (parMet ? ' · par beaten' : '');
-
-    var rows = [
-      ['Breaks', s.score.breaks + ' → ' + fmtScore(s.score.breakPoints)],
-      ['Gap passes', s.score.passes + ' → ' + fmtScore(s.score.passPoints)],
-      ['Overdrives', s.score.overdrives + ' → ' + fmtScore(s.score.overdrivePoints)]
-    ];
-    if (won) {
-      rows.push(['Time bonus', fmtScore(s.score.timeBonus)]);
-      rows.push(['Momentum bonus', fmtScore(s.score.multBonus) + ' (best ×' + s.bestMult + ')']);
-      rows.push(['Charge bonus', fmtScore(s.score.chargeBonus)]);
-    }
-    var html = rows.map(function (r) {
-      return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
-    }).join('');
-    html += '<tr class="total"><td>Total</td><td>' + fmtScore(s.score.total) + '</td></tr>';
-    $('res-breakdown').innerHTML = html;
-
-    // results illustration: authored key art per outcome, hidden if it fails to load
-    var art = $('res-art');
-    art.classList.remove('hidden');
-    art.src = won ? './assets/core-reached.webp' : './assets/dive-over.webp';
-
-    var prog = [];
-    if (isNewBest) { prog.push('New personal best!'); if (playKind !== 'tutorial') Audio.sfxNewBest(); }
-    if (playKind === 'journey' && won) {
-      prog.push(parMet ? '★★ Par beaten' : '★ Stage clear');
-      var stars = Session.totalStars();
-      var nextTheme = null;
-      Content.THEMES.forEach(function (th) { if (th.unlockStars > stars && (!nextTheme || th.unlockStars < nextTheme.unlockStars)) nextTheme = th; });
-      if (nextTheme) prog.push((nextTheme.unlockStars - stars) + ' stars to unlock theme “' + nextTheme.name + '”');
-    }
-    if (playKind === 'daily') prog.push('Daily logged for ' + playCtx.date);
-    $('res-progress').textContent = prog.join(' · ');
-    $('res-achievements').textContent = '';
-    $('res-replay').textContent = 'Replay hash ' + replay.hash.toString(16) + ' · seed ' + replay.seed +
-      ' · ' + inputLog.length + ' commands';
+    if (isNewBest && playKind !== 'tutorial') Audio.sfxNewBest();
+    lastResults = { s: s, won: won, parMet: parMet, isNewBest: isNewBest, replay: replay, commands: inputLog.length };
+    renderResults();
 
     var nextBtn = $('btn-next');
     if (playKind === 'journey' && won && playCtx.levelIndex != null && playCtx.levelIndex + 1 < Content.JOURNEY.length) {
@@ -938,21 +932,73 @@
 
     postToLeaderboard(s.score.total);
     openOverlay('overlay-results');
-    announce((won ? 'Victory. ' : 'Defeat. ') + 'Total score ' + s.score.total + '. ' + reasonText(t.reason), true);
+    announce((won ? T('Victory.') : T('Defeat.')) + ' ' + T('Total score {n}.', { n: s.score.total }) + ' ' + reasonText(t.reason), true);
+  }
+
+  // Results card from the stored round result (re-run on a language change).
+  var lastResults = null;
+  function renderResults() {
+    var R = lastResults;
+    if (!R) return;
+    var s = R.s, won = R.won, parMet = R.parMet;
+    $('res-headline').textContent = won ? T('Core Reached!') : T('Dive Over');
+    $('res-reason').textContent = cfgName(playCfg, playKind) + ' — ' + reasonText(s.terminal.reason) +
+      ' · ' + T('time {time}', { time: fmtTime(s.elapsedMs) }) + (parMet ? ' · ' + T('par beaten') : '');
+
+    var rows = [
+      [T('Breaks'), s.score.breaks + ' → ' + fmtScore(s.score.breakPoints)],
+      [T('Gap passes'), s.score.passes + ' → ' + fmtScore(s.score.passPoints)],
+      [T('Overdrives'), s.score.overdrives + ' → ' + fmtScore(s.score.overdrivePoints)]
+    ];
+    if (won) {
+      rows.push([T('Time bonus'), fmtScore(s.score.timeBonus)]);
+      rows.push([T('Momentum bonus'), fmtScore(s.score.multBonus) + ' ' + T('(best ×{n})', { n: s.bestMult })]);
+      rows.push([T('Charge bonus'), fmtScore(s.score.chargeBonus)]);
+    }
+    var html = rows.map(function (r) {
+      return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>';
+    }).join('');
+    html += '<tr class="total"><td>' + esc(T('Total')) + '</td><td>' + fmtScore(s.score.total) + '</td></tr>';
+    $('res-breakdown').innerHTML = html;
+
+    // results illustration: authored key art per outcome, hidden if it fails to load
+    var art = $('res-art');
+    var src = won ? './assets/core-reached.webp' : './assets/dive-over.webp';
+    if (art.getAttribute('src') !== src) { art.classList.remove('hidden'); art.src = src; }
+
+    var prog = [];
+    if (R.isNewBest) prog.push(T('New personal best!'));
+    if (playKind === 'journey' && won) {
+      prog.push(parMet ? T('★★ Par beaten') : T('★ Stage clear'));
+      var stars = Session.totalStars();
+      var nextTheme = null;
+      Content.THEMES.forEach(function (th) { if (th.unlockStars > stars && (!nextTheme || th.unlockStars < nextTheme.unlockStars)) nextTheme = th; });
+      if (nextTheme) prog.push(T('{n} stars to unlock theme “{name}”', { n: nextTheme.unlockStars - stars, name: T(nextTheme.name) }));
+    }
+    if (playKind === 'daily') prog.push(T('Daily logged for {date}', { date: playCtx.date }));
+    $('res-progress').textContent = prog.join(' · ');
+    $('res-achievements').textContent = '';
+    $('res-replay').textContent = T('Replay hash {hash} · seed {seed} · {n} commands', { hash: R.replay.hash.toString(16), seed: R.replay.seed, n: R.commands });
+    renderLbLine();
   }
 
   // Signed in only: a finished Score Chase dive posts its total to the
   // platform high-score board and the results card shows the player's rank.
+  var lbState = null; // null | 'posting' | { posted, rank }
   function postToLeaderboard(total) {
     var line = $('res-leaderboard'), P = window.CBPlatform;
     if (!line) return;
-    if (playKind !== 'score' || !P || !P.hosted) { line.textContent = ''; line.classList.add('hidden'); return; }
+    if (playKind !== 'score' || !P || !P.hosted) { lbState = null; line.textContent = ''; line.classList.add('hidden'); return; }
     line.classList.remove('hidden');
-    line.textContent = P_STR.lbPosting;
-    P.submitScore(total).then(function (r) {
-      line.textContent = !r.posted ? P_STR.lbNotPosted
-        : r.rank ? P_STR.lbRank.replace('{rank}', r.rank) : P_STR.lbPosted;
-    });
+    lbState = 'posting';
+    renderLbLine();
+    P.submitScore(total).then(function (r) { lbState = r; renderLbLine(); });
+  }
+  function renderLbLine() {
+    var line = $('res-leaderboard'), r = lbState;
+    if (!line || !r) return;
+    line.textContent = r === 'posting' ? P_STR.lbPosting : !r.posted ? P_STR.lbNotPosted
+      : r.rank ? P_STR.lbRank.replace('{rank}', r.rank) : P_STR.lbPosted;
   }
 
   function recordLocalBoard(s) {
@@ -1019,23 +1065,23 @@
 
   function renderHelp() {
     var cards = [
-      ['Hold to dive', 'Press and hold (mouse, touch, or Space). The striker smashes through bright crystal segments and builds momentum — each consecutive break is worth more.'],
-      ['Release for armor', 'Dark spiked segments are armored. Landing on one ends the dive unless your charge cell is full. Release to hover and let a safe segment rotate in — hovering slowly bleeds descent progress.'],
-      ['Gaps', 'Missing segments are gaps: you fall straight through, keep your streak, and gain a few points.'],
-      ['Charge & overdrive', 'Safe breaks charge the striker. At full charge the next armored segment shatters too — an overdrive worth big points.'],
-      ['Momentum', 'Releasing resets your ×multiplier. Long controlled streaks win stages and beat par.'],
-      ['Undo', 'In relaxed modes each release banks a rewind point. Press U or Undo to return to your last release.']
+      [T('Hold to dive'), T('Press and hold (mouse, touch, or Space). The striker smashes through bright crystal segments and builds momentum — each consecutive break is worth more.')],
+      [T('Release for armor'), T('Dark spiked segments are armored. Landing on one ends the dive unless your charge cell is full. Release to hover and let a safe segment rotate in — hovering slowly bleeds descent progress.')],
+      [T('Gaps'), T('Missing segments are gaps: you fall straight through, keep your streak, and gain a few points.')],
+      [T('Charge & overdrive'), T('Safe breaks charge the striker. At full charge the next armored segment shatters too — an overdrive worth big points.')],
+      [T('Momentum'), T('Releasing resets your ×multiplier. Long controlled streaks win stages and beat par.')],
+      [T('Undo'), T('In relaxed modes each release banks a rewind point. Press U or Undo to return to your last release.')]
     ];
     $('help-cards').innerHTML = cards.map(function (c) {
-      return '<p><strong>' + c[0] + '.</strong> ' + c[1] + '</p>';
+      return '<p><strong>' + esc(c[0]) + '.</strong> ' + esc(c[1]) + '</p>';
     }).join('');
     var ctrls = [
-      'Mouse / touch: hold anywhere on the playfield (or the HOLD button) to dive; release to hover.',
-      keysFor('dive') + ': hold to dive, release to hover' + (Session.getSetting('holdToggle') ? ' (toggle mode: tap)' : '') + '.',
-      keysFor('toggle') + ': tap to toggle dive/hover.',
-      keysFor('pause') + ' or ' + keysFor('back') + ': pause / resume. ' + keysFor('undo') + ': undo (where allowed). ' + keysFor('retry') + ': retry from results.'
+      T('Mouse / touch: hold anywhere on the playfield (or the HOLD button) to dive; release to hover.'),
+      T(Session.getSetting('holdToggle') ? '{keys}: hold to dive, release to hover (toggle mode: tap).' : '{keys}: hold to dive, release to hover.', { keys: keysFor('dive') }),
+      T('{keys}: tap to toggle dive/hover.', { keys: keysFor('toggle') }),
+      T('{pause} or {back}: pause / resume. {undo}: undo (where allowed). {retry}: retry from results.', { pause: keysFor('pause'), back: keysFor('back'), undo: keysFor('undo'), retry: keysFor('retry') })
     ];
-    $('help-controls').innerHTML = ctrls.map(function (c) { return '<li>' + c + '</li>'; }).join('');
+    $('help-controls').innerHTML = ctrls.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('');
   }
 
   // ---------- wire up ----------
@@ -1103,7 +1149,7 @@
     Content.THEMES.forEach(function (th) {
       var opt = document.createElement('option');
       opt.value = th.id;
-      opt.textContent = th.name + (th.unlockStars > stars ? ' (' + th.unlockStars + '★ locked)' : '');
+      opt.textContent = T(th.name) + (th.unlockStars > stars ? ' ' + T('({n}★ locked)', { n: th.unlockStars }) : '');
       opt.disabled = th.unlockStars > stars;
       sel.appendChild(opt);
     });
@@ -1157,12 +1203,61 @@
     P.loadBindings(DEFAULT_KEYS).then(function (b) { setBindings(b); renderHelp(); }).catch(function () {});
   }
 
+  var webglMissing = false;
+
+  // Game language changed (Settings → Language, or the account preference
+  // arrived): js/i18n.js re-applied the static markup; re-render every string
+  // built in code in place. The round, its clock and the shaft are untouched.
+  function onLanguage() {
+    P_STR = PT[Gfx.pickLocale(curLangs())] || PT['en-US'];
+    gfxStr = Gfx.strings(Gfx.pickLocale(curLangs()));
+    var texts = document.querySelectorAll('[data-gfx-text]');
+    for (var i = 0; i < texts.length; i++) texts[i].textContent = gfxStr[texts[i].getAttribute('data-gfx-text')];
+    Gfx.CATEGORY_ORDER.forEach(function (cat) {
+      var sel = $('set-gfx-' + cat);
+      if (!sel) return;
+      var label = document.querySelector('label[for="set-gfx-' + cat + '"]');
+      if (label) label.textContent = gfxStr.cats[cat];
+      for (var j = 1; j < sel.options.length; j++) sel.options[j].textContent = gfxStr.tiers[sel.options[j].value] || sel.options[j].value;
+    });
+    loadGfxUI();
+    $('btn-signin').textContent = P_STR.signIn;
+    $('btn-invite').textContent = P_STR.invite;
+    if (webglMissing) $('title-compat').textContent = T('WebGL is unavailable in this browser, so the 3D shaft cannot render. Your progress and settings are safe; try a browser with WebGL enabled.');
+    renderAccountLine();
+    renderTitleProgress();
+    renderPracticeList();
+    renderChallengeList();
+    fillThemeSelect(practiceTheme);
+    fillThemeSelect(setTheme);
+    renderHelp();
+    if (!$('screen-journey').classList.contains('hidden')) renderJourneyGrid();
+    if (!$('screen-daily').classList.contains('hidden')) renderDailyScreen();
+    if (!$('screen-score').classList.contains('hidden')) renderScoreScreen();
+    if (!$('overlay-intro').classList.contains('hidden')) renderIntro();
+    if (playState) {
+      $('btn-hold').textContent = Session.getSetting('holdToggle') ? T('TAP TO DIVE') : T('HOLD TO DIVE');
+      $('hud-objective').textContent = objectiveText();
+      if (!countingDown) updateHUD();
+    }
+    if (!$('overlay-results').classList.contains('hidden')) renderResults();
+  }
+  document.addEventListener('cb-language', onLanguage);
+
   function boot() {
     // Platform handshake: StarHermit.init() reads the launch token.
     var P = window.CBPlatform;
     try { P.init(); } catch (e) { /* offline */ }
     P.onSync(renderAccountLine);
     P.onAuth(function () { renderAccountLine(); syncFromPlatform(); });
+    // Save conflict: merge the newer cloud doc into this device's and save the
+    // merge (Session.mergeWrapped keeps the better of both).
+    P.onConflict(function (raw) {
+      Session.mergeWrapped(raw);
+      renderTitleProgress();
+      renderPracticeList();
+      renderChallengeList();
+    });
     $('btn-signin').textContent = P_STR.signIn;
     $('btn-invite').textContent = P_STR.invite;
     $('btn-signin').addEventListener('click', function () { Audio.sfxUi(); P.signIn(); });
@@ -1171,9 +1266,8 @@
     var ok = false;
     try { ok = Render.init($('game-canvas')); } catch (e) { ok = false; }
     if (!ok || !Render.isAvailable()) {
-      $('title-compat').textContent =
-        'WebGL is unavailable in this browser, so the 3D shaft cannot render. ' +
-        'Your progress and settings are safe; try a browser with WebGL enabled.';
+      webglMissing = true;
+      $('title-compat').textContent = T('WebGL is unavailable in this browser, so the 3D shaft cannot render. Your progress and settings are safe; try a browser with WebGL enabled.');
     }
     applySettings();
     renderPracticeList();
