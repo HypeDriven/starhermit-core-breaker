@@ -28,7 +28,7 @@
   // Each preset is a row of tiers plus a render scale (multiplies the capped device pixel ratio).
   var TABLE = {
     low: { scale: 1, shadows: 'off', ao: 'off', bloom: 'off', grade: 'off', antialias: 'msaa', reflections: 'off', detail: 'plain', particles: 'low', background: 'static' },
-    balanced: { scale: 1, shadows: 'low', ao: 'off', bloom: 'on', grade: 'on', antialias: 'fxaa', reflections: 'on', detail: 'detailed', particles: 'medium', background: 'animated' },
+    balanced: { scale: 0.9, shadows: 'low', ao: 'off', bloom: 'on', grade: 'on', antialias: 'fxaa', reflections: 'on', detail: 'detailed', particles: 'medium', background: 'animated' },
     high: { scale: 1, shadows: 'medium', ao: 'on', bloom: 'on', grade: 'on', antialias: 'smaa', reflections: 'on', detail: 'detailed', particles: 'high', background: 'animated' },
     ultra: { scale: 1.25, shadows: 'high', ao: 'high', bloom: 'on', grade: 'on', antialias: 'msaa', reflections: 'on', detail: 'detailed', particles: 'high', background: 'animated' }
   };
@@ -40,19 +40,62 @@
 
   function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
 
-  /** Best preset for this GPU, from the unmasked renderer string when the browser exposes it. */
-  function detectPreset(gpu) {
-    var g = String(gpu || '').toLowerCase();
-    if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(g)) return 'low';
-    if (/nvidia|geforce|rtx|gtx|quadro|radeon rx|radeon pro|amd radeon(?!.*graphics)|apple m\d/.test(g)) return 'high';
-    return 'balanced';
+  // Auto picks the preset from the StarHermit hardware level (0 = Galaxy S20 / Intel UHD or weaker, 20 = RTX
+  // 5090; js/gpu-level.js → window.StarHermitGpu): Low from 0, Balanced from 4, High from 10, Ultra from 17.
+  // Phones, tablets and ≤ 4 GB machines are capped at level 9 (Balanced); software renderers are level 0.
+  var PRESET_LEVELS = { low: 0, balanced: 4, high: 10, ultra: 17 };
+  function gpuApi() { return (typeof self !== 'undefined' ? self : globalThis).StarHermitGpu; }
+
+  /** Hardware level (0–20) for an unmasked renderer string plus StarHermitGpu.detectSystem() facts. */
+  function detectLevel(gpu, system) {
+    var G = gpuApi();
+    if (!G) return PRESET_LEVELS.balanced;
+    var sys = typeof system === 'boolean' ? { mobile: system } : (system || {});
+    return G.detectLevel(Object.assign({}, sys, { gpu: String(gpu || '') }));
+  }
+  /** The preset Auto starts from for a hardware level. */
+  function presetForLevel(level) {
+    var G = gpuApi();
+    if (G) return G.presetForLevel(level, PRESET_LEVELS);
+    return level >= 17 ? 'ultra' : level >= 10 ? 'high' : level >= 4 ? 'balanced' : 'low';
+  }
+  /** Best preset for a GPU (the hardware level already caps phones/tablets at Balanced). */
+  function detectPreset(gpu, system) { return presetForLevel(detectLevel(gpu, system)); }
+  /** Auto choice (legacy name): the preset for the GPU's hardware level. */
+  function autoPreset(gpu, system) { return detectPreset(gpu, system); }
+
+  /** Scale a count tuned at the preset's floor level up for faster GPUs (≤ 4×, never below the floor). */
+  function scaleCount(n, preset, level) {
+    var G = gpuApi();
+    var floor = PRESET_LEVELS[preset] || 0;
+    return Math.round(G ? G.scaleBudget(n, Math.max(Number(level) || 0, floor), floor) : n);
   }
 
-  /** Auto choice: the detected tier, capped at Balanced on touch / mobile devices. */
-  function autoPreset(gpu, mobile) {
-    var p = detectPreset(gpu);
-    if (mobile && PRESETS.indexOf(p) > PRESETS.indexOf('balanced')) p = 'balanced';
-    return p;
+  /*
+   * Per-preset asset and effect budget. Each preset is tuned to hold 60 FPS on the weakest GPU Auto gives
+   * it (Low → level 0, Balanced → 4, High → 10, Ultra → 17; measured with tests/gfx-bench.mjs).
+   *   material     ring segments: 'lambert' | 'standard' | 'physical' (clear-coat crystal and armour);
+   *   texture      crystal/armour canvas width in px (detailed surfaces; half as tall);
+   *   bevel        rounded-segment bevel segments (detailed surfaces);
+   *   wallSegments radial segments of the gridded shaft wall;
+   *   motes        rising shaft motes at the floor level;
+   *   shards       shard-burst pool in use at the floor level (the Particles tier also thins each burst);
+   *   bloomRes / aoRes  bloom and GTAO resolution as a fraction of the frame.
+   */
+  var BUDGETS = {
+    low:      { material: 'lambert',  texture: 128, bevel: 2, wallSegments: 24, motes: 60,  shards: 60,  bloomRes: 0.5, aoRes: 0.5 },
+    balanced: { material: 'standard', texture: 256, bevel: 2, wallSegments: 32, motes: 100, shards: 100, bloomRes: 0.5, aoRes: 0.5 },
+    high:     { material: 'physical', texture: 256, bevel: 3, wallSegments: 48, motes: 160, shards: 140, bloomRes: 0.5, aoRes: 0.5 },
+    ultra:    { material: 'physical', texture: 512, bevel: 4, wallSegments: 64, motes: 240, shards: 200, bloomRes: 1, aoRes: 1 }
+  };
+  var MOTE_MAX = 600, SHARD_MAX = 400;
+
+  /** A preset's concrete budget for a hardware level. */
+  function budgetFor(preset, level) {
+    var b = Object.assign({}, BUDGETS[preset] || BUDGETS.balanced);
+    b.motes = Math.min(MOTE_MAX, scaleCount(b.motes, preset, level));
+    b.shards = Math.min(SHARD_MAX, scaleCount(b.shards, preset, level));
+    return b;
   }
 
   /** Older saves used auto | low | medium | high. */
@@ -65,7 +108,7 @@
    * Resolve saved settings into concrete tiers.
    * `saved`: { preset: 'auto'|preset, render_scale, adaptive, show_fps, <category>: 'preset'|tier }.
    */
-  function resolve(saved, detected) {
+  function resolve(saved, detected, level) {
     var s = saved || {};
     var explicit = PRESETS.indexOf(normalizePreset(s.preset)) >= 0;
     var preset = explicit ? normalizePreset(s.preset) : (PRESETS.indexOf(detected) >= 0 ? detected : 'balanced');
@@ -85,6 +128,8 @@
     out.showFps = !!s.show_fps;
     out.shadowMap = SHADOW_MAP[out.shadows];
     out.particleShare = PARTICLE_SHARE[out.particles];
+    out.level = level == null ? PRESET_LEVELS[preset] : level;
+    out.budget = budgetFor(preset, out.level);
     // Post-processing runs only when something needs it; otherwise the canvas MSAA is used.
     out.post = out.ao !== 'off' || out.bloom === 'on' || out.grade === 'on' ||
       out.antialias === 'fxaa' || out.antialias === 'smaa';
@@ -113,7 +158,7 @@
     heading: 'Graphics', quality: 'Quality', auto: 'Auto (detected: {tier})', scale: 'Render scale',
     fromPreset: 'From preset ({tier})', adaptive: 'Adaptive resolution', showFps: 'Show frame rate',
     postFailed: 'Post-processing is unavailable on this device; effects that need it are off.',
-    unknownGpu: 'unknown GPU', fps: 'fps',
+    unknownGpu: 'unknown GPU', level: 'Level {n}', fps: 'fps',
     presets: { low: 'Low', balanced: 'Balanced', high: 'High', ultra: 'Ultra' },
     cats: { shadows: 'Shadows', ao: 'Ambient occlusion', bloom: 'Bloom', grade: 'Color grade', antialias: 'Anti-aliasing',
       reflections: 'Reflections', detail: 'Surface detail', particles: 'Particles', background: 'Shaft background' },
@@ -134,7 +179,7 @@
     heading: 'Gráficos', quality: 'Calidad', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderizado',
     fromPreset: 'Según el ajuste ({tier})', adaptive: 'Resolución adaptativa', showFps: 'Mostrar fotogramas por segundo',
     postFailed: 'El posprocesado no está disponible en este dispositivo; los efectos que lo necesitan están desactivados.',
-    unknownGpu: 'GPU desconocida', fps: 'fps',
+    unknownGpu: 'GPU desconocida', level: 'Nivel {n}', fps: 'fps',
     presets: { low: 'Baja', balanced: 'Equilibrada', high: 'Alta', ultra: 'Ultra' },
     cats: { shadows: 'Sombras', ao: 'Oclusión ambiental', bloom: 'Resplandor', grade: 'Corrección de color', antialias: 'Suavizado de bordes',
       reflections: 'Reflejos', detail: 'Detalle de superficies', particles: 'Partículas', background: 'Fondo del pozo' },
@@ -147,7 +192,7 @@
     heading: 'Graphismes', quality: 'Qualité', auto: 'Automatique (détectée : {tier})', scale: 'Échelle de rendu',
     fromPreset: 'Selon le préréglage ({tier})', adaptive: 'Résolution adaptative', showFps: 'Afficher la fréquence d’images',
     postFailed: 'Le post-traitement n’est pas disponible sur cet appareil ; les effets qui en dépendent sont désactivés.',
-    unknownGpu: 'GPU inconnu', fps: 'i/s',
+    unknownGpu: 'GPU inconnu', level: 'Niveau {n}', fps: 'i/s',
     presets: { low: 'Basse', balanced: 'Équilibrée', high: 'Haute', ultra: 'Ultra' },
     cats: { shadows: 'Ombres', ao: 'Occlusion ambiante', bloom: 'Halo lumineux', grade: 'Étalonnage des couleurs', antialias: 'Anticrénelage',
       reflections: 'Reflets', detail: 'Détail des surfaces', particles: 'Particules', background: 'Fond du puits' },
@@ -167,7 +212,7 @@
       heading: 'Grafik', quality: 'Qualität', auto: 'Automatisch (erkannt: {tier})', scale: 'Renderskalierung',
       fromPreset: 'Aus Voreinstellung ({tier})', adaptive: 'Adaptive Auflösung', showFps: 'Bildrate anzeigen',
       postFailed: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar; Effekte, die sie benötigen, sind aus.',
-      unknownGpu: 'unbekannte GPU', fps: 'fps',
+      unknownGpu: 'unbekannte GPU', level: 'Stufe {n}', fps: 'fps',
       presets: { low: 'Niedrig', balanced: 'Ausgewogen', high: 'Hoch', ultra: 'Ultra' },
       cats: { shadows: 'Schatten', ao: 'Umgebungsverdeckung', bloom: 'Leuchteffekt', grade: 'Farbkorrektur', antialias: 'Kantenglättung',
         reflections: 'Spiegelungen', detail: 'Oberflächendetails', particles: 'Partikel', background: 'Schachthintergrund' },
@@ -180,7 +225,7 @@
       heading: 'Gráficos', quality: 'Qualidade', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderização',
       fromPreset: 'Da predefinição ({tier})', adaptive: 'Resolução adaptativa', showFps: 'Mostrar taxa de quadros',
       postFailed: 'O pós-processamento não está disponível neste dispositivo; os efeitos que dependem dele estão desligados.',
-      unknownGpu: 'GPU desconhecida', fps: 'fps',
+      unknownGpu: 'GPU desconhecida', level: 'Nível {n}', fps: 'fps',
       presets: { low: 'Baixa', balanced: 'Equilibrada', high: 'Alta', ultra: 'Ultra' },
       cats: { shadows: 'Sombras', ao: 'Oclusão ambiente', bloom: 'Brilho', grade: 'Correção de cor', antialias: 'Antisserrilhamento',
         reflections: 'Reflexos', detail: 'Detalhe das superfícies', particles: 'Partículas', background: 'Fundo do poço' },
@@ -193,7 +238,7 @@
       heading: 'Grafica', quality: 'Qualità', auto: 'Automatica (rilevata: {tier})', scale: 'Scala di rendering',
       fromPreset: 'Dal preset ({tier})', adaptive: 'Risoluzione adattiva', showFps: 'Mostra frequenza fotogrammi',
       postFailed: 'La post-elaborazione non è disponibile su questo dispositivo; gli effetti che la richiedono sono disattivati.',
-      unknownGpu: 'GPU sconosciuta', fps: 'fps',
+      unknownGpu: 'GPU sconosciuta', level: 'Livello {n}', fps: 'fps',
       presets: { low: 'Bassa', balanced: 'Bilanciata', high: 'Alta', ultra: 'Ultra' },
       cats: { shadows: 'Ombre', ao: 'Occlusione ambientale', bloom: 'Bagliore', grade: 'Correzione colore', antialias: 'Antialiasing',
         reflections: 'Riflessi', detail: 'Dettaglio superfici', particles: 'Particelle', background: 'Sfondo del pozzo' },
@@ -243,6 +288,8 @@
   return {
     PRESETS: PRESETS, CATEGORIES: CATEGORIES, CATEGORY_ORDER: CATEGORY_ORDER, TABLE: TABLE,
     PIXEL_CAP: PIXEL_CAP, SHADOW_MAP: SHADOW_MAP, STRINGS: STRINGS,
+    PRESET_LEVELS: PRESET_LEVELS, BUDGETS: BUDGETS, MOTE_MAX: MOTE_MAX, SHARD_MAX: SHARD_MAX,
+    detectLevel: detectLevel, presetForLevel: presetForLevel, budgetFor: budgetFor,
     detectPreset: detectPreset, autoPreset: autoPreset, normalizePreset: normalizePreset,
     resolve: resolve, choosePreset: choosePreset, presetTier: presetTier,
     pickLocale: pickLocale, strings: strings, fmt: fmt, describe: describe

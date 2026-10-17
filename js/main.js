@@ -297,7 +297,7 @@
   function refreshGfxSummary() {
     var info = Render.graphicsInfo ? Render.graphicsInfo() : null;
     if (!info || !info.resolved) { $('gfx-summary').textContent = ''; return; }
-    $('gfx-summary').textContent = [info.gpu || gfxStr.unknownGpu,
+    $('gfx-summary').textContent = [info.gpu || gfxStr.unknownGpu, Gfx.fmt(gfxStr.level, { n: info.level }),
       Gfx.describe(info.resolved, info.pixels[0] ? info.pixels : null, gfxStr)].join(' · ');
     $('gfx-summary').setAttribute('data-gfx-preset', info.resolved.preset);
     var note = $('gfx-post-note');

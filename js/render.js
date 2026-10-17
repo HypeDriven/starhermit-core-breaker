@@ -21,8 +21,8 @@
   var CAM_LOOK = { x: 0, y: -1.2, z: 0 };
   var camBase = { x: CAM_POS.x, y: CAM_POS.y, z: CAM_POS.z }; // fitted per aspect (see fitCamera)
   var WINDOW_ABOVE = 3, WINDOW_BELOW = 12; // rendered layers around depth
-  var PARTICLE_POOL = 140;
-  var WALL_R = 11, WALL_H = 70, MOTES = 160;
+  var PARTICLE_POOL = 400;     // allocated shard meshes; the preset budget (q.budget.shards) uses a prefix
+  var WALL_R = 11, WALL_H = 70, MOTES = 600; // allocated motes; the draw range follows q.budget.motes
 
   var canvas = null, renderer = null, scene = null, camera = null;
   var shaftGroup = null, striker = null, coreGlow = null, pipGroup = null;
@@ -41,7 +41,7 @@
   var clock = 0;
 
   // graphics state
-  var gpu = '', detected = 'balanced', saved = {}, q = null;
+  var gpu = '', detected = 'balanced', level = 4, saved = {}, q = null;
   var composer = null, postKey = null, postFailed = false;
   var pixelRatio = 1, size = [0, 0], adaptiveScale = 1, frames = [], fps = 0;
 
@@ -53,10 +53,14 @@
 
   // ---------- procedural textures (detailed surfaces) ----------
 
-  function canvasTex(w, h, paint, srgb) {
+  // k: texture-size variant (preset budget); painted in the w×h design space and scaled.
+  function canvasTex(w, h, paint, srgb, k) {
+    k = k || 1;
     var c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    paint(c.getContext('2d'), w, h);
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    var g = c.getContext('2d');
+    g.scale(k, k);
+    paint(g, w, h);
     var t = new THREE.CanvasTexture(c);
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
@@ -65,7 +69,7 @@
 
   // Crystal: soft value noise + angular facet veins. `map` modulates the base colour,
   // the vein layer drives the emissive glow so fractures shimmer under bloom.
-  function crystalTextures() {
+  function crystalTextures(k) {
     var r = RNG.create(771);
     var map = canvasTex(256, 128, function (g, w, h) {
       g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, w, h);
@@ -82,7 +86,7 @@
         for (var s = 0; s < 4; s++) { x += (r.next() - 0.5) * 90; y += (r.next() - 0.5) * 60; g.lineTo(x, y); }
         g.stroke();
       }
-    }, true);
+    }, true, k);
     var r2 = RNG.create(771);
     var glow = canvasTex(256, 128, function (g, w, h) {
       g.fillStyle = '#2a2a2a'; g.fillRect(0, 0, w, h);
@@ -95,12 +99,12 @@
         for (var s = 0; s < 4; s++) { x += (r2.next() - 0.5) * 90; y += (r2.next() - 0.5) * 60; g.lineTo(x, y); }
         g.stroke();
       }
-    }, true);
+    }, true, k);
     return { map: map, glow: glow };
   }
 
   // Armor: brushed plate with panel seams and rivets; a warning chevron band glows along the edge.
-  function armorTextures() {
+  function armorTextures(k) {
     var r = RNG.create(4242);
     var map = canvasTex(256, 128, function (g, w, h) {
       g.fillStyle = '#b4b4b4'; g.fillRect(0, 0, w, h);
@@ -116,14 +120,14 @@
       [[16, 16], [w - 16, 16], [16, h - 16], [w - 16, h - 16], [w / 2 - 12, h / 2], [w / 2 + 12, h / 2]].forEach(function (p) {
         g.beginPath(); g.arc(p[0], p[1], 4, 0, Math.PI * 2); g.fill();
       });
-    }, true);
+    }, true, k);
     var glow = canvasTex(256, 128, function (g, w, h) {
       g.fillStyle = '#000000'; g.fillRect(0, 0, w, h);
       g.fillStyle = '#ffffff';
       for (var x = -20; x < w + 20; x += 24) {
         g.beginPath(); g.moveTo(x, h - 16); g.lineTo(x + 12, h - 16); g.lineTo(x + 22, h - 4); g.lineTo(x + 10, h - 4); g.closePath(); g.fill();
       }
-    }, true);
+    }, true, k);
     return { map: map, glow: glow };
   }
 
@@ -163,7 +167,9 @@
     } catch (e) { gpu = ''; }
     var mobile = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
       /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-    detected = Gfx.autoPreset(gpu, mobile);
+    // StarHermit hardware level → Auto preset (SwiftShader = level 0 → Low; phones cap at Balanced).
+    level = Gfx.detectLevel(gpu, window.StarHermitGpu ? window.StarHermitGpu.detectSystem() : { mobile: mobile });
+    detected = Gfx.presetForLevel(level);
   }
 
   function init(cv) {
@@ -312,13 +318,68 @@
     cam.updateProjectionMatrix();
   }
 
+  // ---------- per-preset asset variants ----------
+
+  // Segment materials in the budget's class: Lambert on Low, Standard on Balanced, Physical (clear coat on
+  // the detailed crystal and armour) on High/Ultra; detailed textures at the budget's size.
+  var segTex = null;
+  function buildMats() {
+    var b = q.budget, kind = b.material;
+    if (segTex) [segTex.ct.map, segTex.ct.glow, segTex.at.map, segTex.at.glow].forEach(function (t) { t.dispose(); });
+    else if (mats) [mats.detailed.safe, mats.detailed.armor].forEach(function (m) { if (m.map) m.map.dispose(); if (m.emissiveMap) m.emissiveMap.dispose(); });
+    segTex = { ct: crystalTextures(b.texture / 256), at: armorTextures(b.texture / 256) };
+    function mk(physical, params) {
+      var o = {}, key;
+      for (key in params) o[key] = params[key];
+      if (kind === 'lambert') {
+        ['roughness', 'metalness', 'clearcoat', 'clearcoatRoughness', 'envMapIntensity'].forEach(function (x) { delete o[x]; });
+        return new THREE.MeshLambertMaterial(o);
+      }
+      if (kind === 'physical' && physical) return new THREE.MeshPhysicalMaterial(o);
+      delete o.clearcoat; delete o.clearcoatRoughness;
+      return new THREE.MeshStandardMaterial(o);
+    }
+    var old = mats;
+    mats = {
+      plain: {
+        safe: mk(false, { roughness: 0.3, metalness: 0.1, emissiveIntensity: 0.22 }),
+        armor: mk(false, { roughness: 0.5, metalness: 0.55, flatShading: true, emissiveIntensity: 0.1 })
+      },
+      detailed: {
+        safe: mk(true, { roughness: 0.22, metalness: 0.05, clearcoat: 0.7, clearcoatRoughness: 0.18,
+          map: segTex.ct.map, emissiveMap: segTex.ct.glow, emissiveIntensity: 0.35, envMapIntensity: 0.55 }),
+        armor: mk(true, { roughness: 0.42, metalness: 0.8, clearcoat: 0.35, clearcoatRoughness: 0.3,
+          map: segTex.at.map, emissiveMap: segTex.at.glow, emissiveIntensity: 0.9, envMapIntensity: 1.1 })
+      }
+    };
+    if (old) ['plain', 'detailed'].forEach(function (d) { old[d].safe.dispose(); old[d].armor.dispose(); });
+    if (pal) applyPalette();
+  }
+
+  function applyBudget(prev) {
+    var b = q.budget;
+    if (prev.material !== b.material || prev.texture !== b.texture) buildMats();
+    if (prev.bevel !== b.bevel && ADDONS && ADDONS.RoundedBoxGeometry) {
+      var oldGeo = geos.detailed;
+      geos.detailed = new ADDONS.RoundedBoxGeometry(SEG_W, SEG_H, SEG_D, b.bevel, 0.07);
+      if (oldGeo !== geos.plain) oldGeo.dispose();
+    }
+    if (prev.wallSegments !== b.wallSegments) {
+      wall.geometry.dispose();
+      wall.geometry = new THREE.CylinderGeometry(WALL_R, WALL_R, WALL_H, b.wallSegments, 1, true);
+    }
+    motes.geometry.setDrawRange(0, b.motes);
+  }
+
   // ---------- settings ----------
 
   /** Apply saved graphics settings ({preset, render_scale, adaptive, show_fps, <category>}). Live, no reload. */
   function setGraphics(s) {
     saved = s || {};
-    q = Gfx.resolve(saved, detected);
+    var prevBudget = q && q.budget;
+    q = Gfx.resolve(saved, detected, level);
     if (!renderer) return q;
+    applyBudget(prevBudget || {});
     var sz = q.shadowMap;
     renderer.shadowMap.enabled = sz > 0;
     keyLight.castShadow = sz > 0;
@@ -359,7 +420,7 @@
 
   function graphicsInfo() {
     return {
-      gpu: gpu, detected: detected, resolved: q, saved: saved,
+      gpu: gpu, level: level, detected: detected, resolved: q, saved: saved,
       pixels: [Math.round(size[0] * pixelRatio), Math.round(size[1] * pixelRatio)],
       fps: Math.round(fps), adaptiveScale: Math.round(adaptiveScale * 100) / 100,
       postFailed: postFailed, postActive: !!composer
@@ -504,7 +565,7 @@
   function burst(x, y, z, colorHex, count, speed) {
     var n = Math.ceil(count * (q ? q.particleShare : 1));
     for (var i = 0; i < n; i++) {
-      var p = particles[particleIdx++ % PARTICLE_POOL];
+      var p = particles[particleIdx++ % Math.min(PARTICLE_POOL, q ? q.budget.shards : PARTICLE_POOL)]; // pool in use: preset budget
       p.mesh.visible = true;
       p.mesh.material.color.copy(hdr(colorHex, 2.2));
       p.mesh.material.opacity = 1;
@@ -584,6 +645,15 @@
     return q.post ? [q.ao, q.bloom, q.grade, q.antialias, w, h, pixelRatio].join('|') : 'none';
   }
 
+  // Run a post pass at a fraction of the frame (per-preset budget). EffectComposer sizes every pass to the
+  // full frame in addPass/setSize, so the pass's own setSize is wrapped to apply the scale.
+  function atScale(pass, k) {
+    if (!(k > 0 && k < 1)) return pass;
+    var setSize = pass.setSize.bind(pass);
+    pass.setSize = function (w, h) { setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    return pass;
+  }
+
   function buildPost(w, h) {
     if (composer) { composer.dispose(); composer = null; }
     if (!q.post) return;
@@ -596,7 +666,7 @@
       c.setSize(w, h);
       c.addPass(new A.RenderPass(scene, camera));
       if (q.ao !== 'off') {
-        var ao = new A.GTAOPass(scene, camera, pw, ph);
+        var ao = atScale(new A.GTAOPass(scene, camera, pw, ph), q.budget.aoRes);
         ao.output = A.GTAOPass.OUTPUT.Default;
         ao.blendIntensity = 0.7;
         ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.0, scale: 1.0, samples: q.ao === 'high' ? 16 : 8 });
@@ -604,7 +674,7 @@
         c.addPass(ao);
       }
       // high threshold: only the striker, core, charge pips, shard bursts and crystal veins bloom
-      if (q.bloom === 'on') c.addPass(new A.UnrealBloomPass(new THREE.Vector2(w, h), 0.38, 0.35, 0.9));
+      if (q.bloom === 'on') c.addPass(atScale(new A.UnrealBloomPass(new THREE.Vector2(w, h), 0.38, 0.35, 0.9), q.budget.bloomRes));
       if (q.grade === 'on') c.addPass(new A.ShaderPass(GradeShader));
       c.addPass(new A.OutputPass());
       if (q.antialias === 'smaa') c.addPass(new A.SMAAPass(pw, ph));

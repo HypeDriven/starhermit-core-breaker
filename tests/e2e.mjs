@@ -211,6 +211,7 @@ async function runPass(tag, contextOpts, inputMode) {
       await page.selectOption('#set-quality', 'high');
       await presetIs('high');
       await summaryHas(/2048² shadows/);
+      await summaryHas(/ · Level 0 · /);
       const fromPreset = await page.locator('#set-gfx-bloom option[value="preset"]').textContent();
       if (fromPreset !== 'From preset (On)') throw new Error('preset label: ' + fromPreset);
       await page.selectOption('#set-gfx-bloom', 'off');
