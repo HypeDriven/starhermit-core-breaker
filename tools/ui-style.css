@@ -1,0 +1,108 @@
+/* Core Breaker — the browser client's style sheet (css/style.css), kept for
+ * the engine port and rewritten class-based for `starhermit css` (`npm run
+ * css` converts it into assets/ui-style.json, which native/style.ts
+ * registers): ids, element selectors (h1, h2, h3, td, li) and compound
+ * selectors (#hud .stat .lbl, .level-grid button.locked, #res-breakdown
+ * tr.total td) became classes of their own; the media queries, safe-area
+ * insets, the ui-scale zoom, the body classes (high contrast, larger text,
+ * left-handed), the graphics panel and the fps meter are gone: the runtime
+ * gives interface size, text size, high contrast, reduced motion and
+ * graphics, native/style.ts swaps the high-contrast tokens, and
+ * native/screens.ts picks the layouts (wide ≥ 1024 px, compact ≤ 700 px,
+ * short landscape ≤ 500 px tall) by window size. */
+* { box-sizing: border-box; }
+:root {
+  --bg: #0b0918;
+  --panel: rgba(20, 17, 38, 0.92);
+  --panel-border: #4a3f8f;
+  --text: #f2eefc;
+  --dim: #b8b0d8;
+  --accent: #9be8ff;
+  --accent-2: #ffd166;
+  --danger: #ff6b7a;
+  --btn: #241f45;
+  --btn-hover: #322a5e;
+  --primary: #2d6a8f;
+  --primary-hover: #3a86b0;
+  font-size: 16px;
+}
+
+/* ---------- screens ---------- */
+.screen { background: radial-gradient(farthest-corner at 50% 30%, rgba(42, 35, 80, 0.85), rgba(11, 9, 24, 0.97)); }
+.screen-title { background: linear-gradient(rgba(11, 9, 24, 0.62), rgba(11, 9, 24, 0.9)); }
+.overlay { background: rgba(5, 4, 12, 0.7); }
+.card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 18px 22px; color: var(--text); }
+.card-compact { padding: 14px 16px; }
+.h2 { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.h3 { font-size: 1.15rem; font-weight: 700; color: var(--text); }
+.body { color: var(--text); }
+.small { font-size: 13px; color: var(--dim); }
+.strong { font-weight: 700; color: var(--text); }
+
+/* ---------- title ---------- */
+.title-logo { font-size: 60px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); text-shadow: 0 0 24px rgba(155, 232, 255, 0.4); }
+.title-logo-mid { font-size: 46px; }
+.title-logo-compact { font-size: 34px; }
+.subtitle { color: var(--dim); }
+
+/* ---------- buttons ---------- */
+.btn {
+  color: var(--text); background: var(--btn); border: 1px solid var(--panel-border);
+  border-radius: 10px; padding: 10px 18px; min-height: 44px; min-width: 44px; text-align: center;
+}
+.btn:hover { background: var(--btn-hover); }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; }
+.btn-primary { background: var(--primary); border-color: var(--accent); font-weight: 600; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-danger { border-color: var(--danger); }
+.btn-choice { text-align: left; padding: 12px 16px; }
+.btn-choice.active { border-color: var(--accent); }
+.choice-title { font-weight: 700; color: var(--text); }
+.choice-sub { font-size: 13px; color: var(--dim); }
+
+/* ---------- journey grid ---------- */
+.jstage { color: var(--text); background: var(--btn); border: 1px solid var(--panel-border); border-radius: 10px; padding: 4px; font-size: 14px; text-align: center; }
+.jstage:hover { background: var(--btn-hover); }
+.jstage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.jstage:disabled { opacity: 0.4; }
+.jstage-mastery { border-color: var(--accent-2); }
+.jstage-num { font-size: 14px; color: var(--text); }
+.jstage-stars { font-size: 12px; color: var(--accent-2); }
+
+/* ---------- play HUD ---------- */
+.hud { background: linear-gradient(rgba(11, 9, 24, 0.85), rgba(11, 9, 24, 0)); }
+.stat-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); }
+.stat-val { font-size: 20px; font-weight: 600; color: var(--text); }
+.stat-val-wide { font-size: 24px; }
+.stat-val-compact { font-size: 16px; }
+.stat-danger { color: var(--danger); }
+.hud-objective { font-size: 14px; color: var(--accent); }
+.hintbar { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px; padding: 6px 16px; }
+.hintbar-armor { border-color: var(--accent-2); }
+.hintbar-danger { border-color: var(--danger); }
+.hintbar-text { font-size: 14px; color: var(--accent); }
+.countdown-text { font-size: 22px; font-weight: 700; color: var(--accent); }
+.caption { font-size: 13px; color: var(--dim); }
+.btn-hold {
+  font-size: 17px; font-weight: 700; color: var(--text);
+  background: var(--primary); border: 1px solid var(--accent); border-radius: 10px; text-align: center;
+}
+.btn-hold:hover { background: var(--primary-hover); }
+.btn-hold-held { background: var(--primary-hover); box-shadow: 0 0 18px rgba(155, 232, 255, 0.5); }
+
+/* ---------- toast ---------- */
+.toast { background: var(--panel); border: 1px solid var(--accent-2); border-radius: 12px; padding: 10px 20px; }
+.toast-text { font-weight: 600; color: var(--accent-2); text-align: center; }
+
+/* ---------- results ---------- */
+.res-td { color: var(--text); padding: 3px 8px; }
+.res-num { color: var(--text); padding: 3px 8px; text-align: right; }
+.res-total-row { border-top: 1px solid var(--panel-border); }
+.res-total { font-weight: 700; color: var(--text); padding: 8px 8px 3px 8px; }
+.res-art { border: 1px solid var(--panel-border); border-radius: 10px; }
+
+/* ---------- lists ---------- */
+.board-row { font-size: 13px; color: var(--dim); }
+.board-you { font-size: 13px; font-weight: 700; color: var(--accent); }
+.board-head { font-size: 13px; color: var(--dim); }

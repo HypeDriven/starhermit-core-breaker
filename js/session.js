@@ -1,22 +1,40 @@
 /* Core Breaker — local session: versioned, checksummed progress document,
  * settings, achievements, best scores, replay storage. Offline-first; no
- * credentials or tokens are ever persisted here. */
-(function () {
+ * credentials or tokens are ever persisted here.
+ *
+ * The document lives under `localStorage['corebreaker.progress.v1']` as
+ * {v, data, sum} (FNV-1a checksum). On the StarHermit engine that key is a
+ * shim over the game's save (native/platform.ts), so the same wrapped
+ * document is the device copy and the cloud save, exactly as the browser
+ * build's cloud slot held it. The pure helpers (wrap, unwrap, mergeDocs,
+ * gameSettingsFrom) serve the save-conflict merge, the browser build's
+ * migration and the node tests.
+ * UMD: classic script (globalThis.CBSession) / CommonJS. */
+(function (root, factory) {
+  var RNG = (typeof module === 'object' && module.exports) ? require('./rng.js') : root.CBRNG;
+  var api = factory(root, RNG);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.CBSession = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root, RNG) {
   'use strict';
 
-  var RNG = window.CBRNG;
   var DOC_KEY = 'corebreaker.progress.v1';
   var DOC_VERSION = 1;
 
   var DEFAULT_SETTINGS = {
     volMusic: 40, volSfx: 80, volAmbience: 35, muted: 0,
     quality: 'auto',            // graphics preset: auto | low | balanced | high | ultra (legacy 'medium' = balanced)
-    gfx: {},                    // graphics overrides: render_scale, adaptive, show_fps, per-category tiers (js/gfx.js)
+    gfx: {},                    // graphics overrides: render_scale, adaptive, show_fps, per-category tiers
     reducedMotion: 0, highContrast: 0, largeText: 0, leftHanded: 0,
     holdToggle: 0,              // 0 = hold-to-dive, 1 = toggle
     timingAssist: 0,            // widens nothing in rules; shows stronger hints
     captions: 1, theme: 'void'
   };
+  // The options the game itself still offers on the engine (the rest —
+  // volumes, mute, graphics, reduced motion, high contrast, text size — are
+  // the runtime's Options).
+  var GAME_SETTING_KEYS = ['captions', 'leftHanded', 'holdToggle', 'timingAssist', 'theme'];
+  var THEME_IDS = ['void', 'glacial', 'ember', 'verdant', 'solar'];
 
   function emptyDoc() {
     return {
@@ -32,86 +50,116 @@
     };
   }
 
-  var doc = null;
-
   function checksum(payload) {
     return RNG.hashString(JSON.stringify(payload)) >>> 0;
   }
 
+  /** The stored form of a document: {v, data, sum}. */
+  function wrap(d) { return { v: DOC_VERSION, data: d, sum: checksum(d) }; }
+
+  /** A wrapped document (object or JSON text) → its data with defaults filled, or null when the
+   * version or checksum does not match (unknown version or corrupted: start clean). */
+  function unwrap(w) {
+    try {
+      var o = typeof w === 'string' ? JSON.parse(w) : w;
+      if (!o || typeof o !== 'object' || o.v !== DOC_VERSION || !o.data || typeof o.data !== 'object') return null;
+      if (checksum(o.data) !== o.sum) return null;
+      var d = JSON.parse(JSON.stringify(o.data));
+      var base = emptyDoc();
+      for (var k in base) if (d[k] === undefined || d[k] === null && k !== 'lastReplay') d[k] = base[k];
+      if (!d.settings || typeof d.settings !== 'object') d.settings = base.settings;
+      for (var s in DEFAULT_SETTINGS) if (d.settings[s] === undefined) d.settings[s] = DEFAULT_SETTINGS[s];
+      if (!d.totals || typeof d.totals !== 'object') d.totals = base.totals;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  /** `a` with `b` merged in, neither losing anything: per stage the higher stars and best, the
+   * higher best per board, every daily (better score, won on either), lesson and achievement
+   * (earliest unlock), the larger totals; `a`'s settings and last replay (b's when a has none). */
+  function mergeDocs(a, b) {
+    var out = JSON.parse(JSON.stringify(a || emptyDoc()));
+    if (!b) return out;
+    var k;
+    for (k in b.journey || {}) {
+      var x = out.journey[k], y = b.journey[k];
+      if (!y) continue;
+      out.journey[k] = !x ? { stars: y.stars || 0, best: y.best || 0 } : { stars: Math.max(x.stars || 0, y.stars || 0), best: Math.max(x.best || 0, y.best || 0) };
+    }
+    for (k in b.bests || {}) {
+      if (b.bests[k] && (!out.bests[k] || b.bests[k].score > out.bests[k].score)) out.bests[k] = b.bests[k];
+    }
+    for (k in b.dailies || {}) {
+      var p = out.dailies[k], q = b.dailies[k];
+      if (!q) continue;
+      out.dailies[k] = !p ? q : { score: Math.max(p.score || 0, q.score || 0), won: !!(p.won || q.won) };
+    }
+    for (k in b.tutorialDone || {}) if (b.tutorialDone[k]) out.tutorialDone[k] = true;
+    for (k in b.achievements || {}) {
+      if (!b.achievements[k]) continue;
+      out.achievements[k] = out.achievements[k] ? Math.min(out.achievements[k], b.achievements[k]) : b.achievements[k];
+    }
+    var t = b.totals || {};
+    ['breaks', 'rounds', 'wins'].forEach(function (n) { out.totals[n] = Math.max(out.totals[n] || 0, t[n] || 0); });
+    if (!out.lastReplay && b.lastReplay) out.lastReplay = b.lastReplay;
+    return out;
+  }
+
+  /** A game option's value when valid (booleans as 0/1, a theme id), else undefined. */
+  function checkSetting(key, v) {
+    if (key === 'theme') return THEME_IDS.indexOf(v) >= 0 ? v : undefined;
+    if (GAME_SETTING_KEYS.indexOf(key) < 0) return undefined;
+    if (v === true || v === 1) return 1;
+    if (v === false || v === 0) return 0;
+    return undefined;
+  }
+  /** The game options found in a settings object (a document's, or the account's old keys). */
+  function gameSettingsFrom(obj) {
+    var out = {};
+    if (!obj || typeof obj !== 'object') return out;
+    GAME_SETTING_KEYS.forEach(function (k) {
+      var v = checkSetting(k, obj[k]);
+      if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+
+  var doc = emptyDoc();
+  function storage() { try { return root.localStorage || null; } catch (e) { return null; } }
+
+  /** (Re)reads the document from storage; defaults when missing, of another version or corrupt. */
   function load() {
     doc = emptyDoc();
+    var ls = storage();
+    if (!ls) return;
     try {
-      var raw = localStorage.getItem(DOC_KEY);
-      if (!raw) return;
-      var wrap = JSON.parse(raw);
-      if (!wrap || wrap.v !== DOC_VERSION) return; // unknown version: start clean
-      if (checksum(wrap.data) !== wrap.sum) return; // corrupted: start clean
-      var d = wrap.data;
-      for (var k in doc) if (d[k] === undefined) d[k] = doc[k];
-      for (var s in DEFAULT_SETTINGS) if (d.settings[s] === undefined) d.settings[s] = DEFAULT_SETTINGS[s];
-      doc = d;
+      var d = unwrap(ls.getItem(DOC_KEY));
+      if (d) doc = d;
     } catch (e) { /* storage unavailable or corrupt: run on defaults */ }
   }
 
   function save() {
-    var wrapped = null;
-    try {
-      wrapped = JSON.stringify({ v: DOC_VERSION, data: doc, sum: checksum(doc) });
-      localStorage.setItem(DOC_KEY, wrapped);
-    } catch (e) {}
-    if (window.CBPlatform && typeof window.CBPlatform.onLocalSave === 'function' && wrapped)
-      window.CBPlatform.onLocalSave(wrapped); // host adapter mirrors to the cloud slot
+    var ls = storage();
+    if (!ls) return;
+    try { ls.setItem(DOC_KEY, JSON.stringify(wrap(doc))); } catch (e) { /* full or unavailable */ }
   }
 
   // Validates a wrapped doc string ({v, data, sum}) and, when it matches the
-  // current version and checksum, adopts it as the live doc (remote-preferred
-  // cloud load goes through here). Returns true when adopted.
+  // current version and checksum, adopts it as the live doc. Returns true when adopted.
   function importWrapped(wrapped) {
-    try {
-      var wrap = JSON.parse(wrapped);
-      if (!wrap || wrap.v !== DOC_VERSION) return false;
-      if (checksum(wrap.data) !== wrap.sum) return false;
-      var d = wrap.data;
-      for (var k in doc) if (d[k] === undefined) d[k] = doc[k];
-      for (var s in DEFAULT_SETTINGS) if (d.settings[s] === undefined) d.settings[s] = DEFAULT_SETTINGS[s];
-      doc = d;
-      save(); // local cache mirrors the remote doc
-      return true;
-    } catch (e) { return false; }
+    var d = unwrap(wrapped);
+    if (!d) return false;
+    doc = d;
+    save();
+    return true;
   }
 
-  // Cloud-save conflict (another device saved first): merge the newer cloud doc
-  // into the live one so neither device loses anything — per stage the higher
-  // stars and best, the higher best per board, every daily (better score, won on
-  // either), lesson and achievement (earliest unlock), the larger totals; this
-  // device's settings and last replay. Saves the merge (mirrored to the cloud).
+  // Another device's (or the browser build's) document: merged into the live
+  // one (mergeDocs keeps the better of both, this device's settings and last
+  // replay) and saved. Returns whether the other document was valid.
   function mergeWrapped(wrapped) {
-    var d = null;
-    try {
-      var wrap = wrapped ? JSON.parse(wrapped) : null;
-      if (wrap && wrap.v === DOC_VERSION && checksum(wrap.data) === wrap.sum) d = wrap.data;
-    } catch (e) { d = null; }
-    if (d) {
-      var k;
-      for (k in d.journey || {}) {
-        var a = doc.journey[k], b = d.journey[k];
-        doc.journey[k] = !a ? b : { stars: Math.max(a.stars || 0, b.stars || 0), best: Math.max(a.best || 0, b.best || 0) };
-      }
-      for (k in d.bests || {}) {
-        if (!doc.bests[k] || (d.bests[k] && d.bests[k].score > doc.bests[k].score)) doc.bests[k] = d.bests[k];
-      }
-      for (k in d.dailies || {}) {
-        var x = doc.dailies[k], y = d.dailies[k];
-        doc.dailies[k] = !x ? y : { score: Math.max(x.score || 0, y.score || 0), won: !!(x.won || y.won) };
-      }
-      for (k in d.tutorialDone || {}) if (d.tutorialDone[k]) doc.tutorialDone[k] = true;
-      for (k in d.achievements || {}) {
-        doc.achievements[k] = doc.achievements[k] ? Math.min(doc.achievements[k], d.achievements[k]) : d.achievements[k];
-      }
-      var t = d.totals || {};
-      ['breaks', 'rounds', 'wins'].forEach(function (n) { doc.totals[n] = Math.max(doc.totals[n] || 0, t[n] || 0); });
-      if (!doc.lastReplay && d.lastReplay) doc.lastReplay = d.lastReplay;
-    }
+    var d = unwrap(wrapped);
+    if (d) doc = mergeDocs(doc, d);
     save();
     return !!d;
   }
@@ -120,21 +168,7 @@
 
   // ---------- settings ----------
   function getSetting(key) { return doc.settings[key]; }
-  function setSetting(key, val) {
-    doc.settings[key] = val; save();
-    var P = window.CBPlatform, o = {};
-    if (P && P.hosted && typeof P.patchSettings === 'function') { o[key] = val; P.patchSettings(o); } // settings KV mirror
-  }
-  // Platform settings KV → local doc (known keys only; platform value wins).
-  function applyRemoteSettings(obj) {
-    var changed = false;
-    for (var k in DEFAULT_SETTINGS) {
-      if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] != null &&
-          typeof obj[k] === typeof DEFAULT_SETTINGS[k]) { doc.settings[k] = obj[k]; changed = true; }
-    }
-    if (changed) save();
-    return changed;
-  }
+  function setSetting(key, val) { doc.settings[key] = val; save(); }
 
   // ---------- bests ----------
   function getBest(kind) { var b = doc.bests[kind]; return b ? b.score : null; }
@@ -201,8 +235,13 @@
   function saveReplay(r) { doc.lastReplay = r; save(); }
   function getReplay() { return doc.lastReplay; }
 
-  window.CBSession = {
-    getSetting: getSetting, setSetting: setSetting, applyRemoteSettings: applyRemoteSettings,
+  return {
+    DOC_KEY: DOC_KEY, DOC_VERSION: DOC_VERSION, DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+    GAME_SETTING_KEYS: GAME_SETTING_KEYS, THEME_IDS: THEME_IDS,
+    emptyDoc: emptyDoc, wrap: wrap, unwrap: unwrap, mergeDocs: mergeDocs,
+    checkSetting: checkSetting, gameSettingsFrom: gameSettingsFrom,
+    load: load, get doc() { return doc; },
+    getSetting: getSetting, setSetting: setSetting,
     getBest: getBest, submitBest: submitBest,
     getJourney: getJourney, recordJourney: recordJourney, totalStars: totalStars,
     getDaily: getDaily, recordDaily: recordDaily, dailyCount: dailyCount,
@@ -212,4 +251,4 @@
     saveReplay: saveReplay, getReplay: getReplay,
     importWrapped: importWrapped, mergeWrapped: mergeWrapped
   };
-})();
+});

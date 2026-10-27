@@ -8,18 +8,14 @@
   'use strict';
   var ROWS = [
     // ---- static markup: HUD, title, screens
-    ['Round status', 'Estado de la ronda', 'Rundenstatus', 'État de la manche', 'Status da rodada', 'Stato della partita'],
     ['Score', 'Puntuación', 'Punkte', 'Score', 'Pontuação', 'Punteggio'],
     ['Best', 'Mejor', 'Bestwert', 'Record', 'Melhor', 'Record'],
     ['Depth', 'Profundidad', 'Tiefe', 'Profondeur', 'Profundidade', 'Profondità'],
     ['Time', 'Tiempo', 'Zeit', 'Temps', 'Tempo', 'Tempo'],
     ['Momentum', 'Impulso', 'Schwung', 'Élan', 'Impulso', 'Slancio'],
     ['Charge', 'Carga', 'Ladung', 'Charge', 'Carga', 'Carica'],
-    ['Undo (U)', 'Deshacer (U)', 'Rückgängig (U)', 'Annuler (U)', 'Desfazer (U)', 'Annulla (U)'],
     ['Undo', 'Deshacer', 'Rückgängig', 'Annuler', 'Desfazer', 'Annulla'],
-    ['Pause (P or Esc)', 'Pausa (P o Esc)', 'Pause (P oder Esc)', 'Pause (P ou Échap)', 'Pausar (P ou Esc)', 'Pausa (P o Esc)'],
     ['Pause', 'Pausa', 'Pause', 'Pause', 'Pausar', 'Pausa'],
-    ['Round actions', 'Acciones de la ronda', 'Rundenaktionen', 'Actions de la manche', 'Ações da rodada', 'Azioni della partita'],
     ['HOLD TO DIVE', 'MANTÉN PARA BAJAR', 'HALTEN ZUM TAUCHEN', 'MAINTENIR POUR PLONGER', 'SEGURE PARA DESCER', 'TIENI PER TUFFARTI'],
     ['TAP TO DIVE', 'TOCA PARA BAJAR', 'TIPPEN ZUM TAUCHEN', 'TOUCHER POUR PLONGER', 'TOQUE PARA DESCER', 'TOCCA PER TUFFARTI'],
     ['Hold to smash crystal. Release before armor. Break the core.', 'Mantén para romper cristal. Suelta antes del blindaje. Rompe el núcleo.', 'Halten, um Kristall zu zertrümmern. Vor Panzerung loslassen. Den Kern knacken.', 'Maintenez pour briser le cristal. Relâchez avant le blindage. Brisez le noyau.', 'Segure para quebrar cristal. Solte antes da blindagem. Quebre o núcleo.', 'Tieni premuto per frantumare il cristallo. Rilascia prima della corazza. Spezza il nucleo.'],
@@ -54,15 +50,8 @@
     ['Next Stage', 'Siguiente etapa', 'Nächste Etappe', 'Étape suivante', 'Próxima etapa', 'Tappa successiva'],
     ['Exit to Title', 'Salir al inicio', 'Zum Titel', 'Retour à l’accueil', 'Sair para o início', 'Esci al titolo'],
     ['Audio', 'Audio', 'Audio', 'Audio', 'Áudio', 'Audio'],
-    ['Music', 'Música', 'Musik', 'Musique', 'Música', 'Musica'],
-    ['Effects', 'Efectos', 'Effekte', 'Effets', 'Efeitos', 'Effetti'],
-    ['Ambience', 'Ambiente', 'Atmosphäre', 'Ambiance', 'Ambiente', 'Ambiente'],
-    ['Mute all', 'Silenciar todo', 'Alles stummschalten', 'Tout couper', 'Silenciar tudo', 'Silenzia tutto'],
     ['Sound captions', 'Subtítulos de sonido', 'Untertitel für Geräusche', 'Sous-titres des sons', 'Legendas de som', 'Didascalie dei suoni'],
-    ['Reduced motion', 'Movimiento reducido', 'Reduzierte Bewegung', 'Animations réduites', 'Movimento reduzido', 'Movimento ridotto'],
     ['Accessibility & controls', 'Accesibilidad y controles', 'Barrierefreiheit & Steuerung', 'Accessibilité et commandes', 'Acessibilidade e controles', 'Accessibilità e comandi'],
-    ['High contrast', 'Alto contraste', 'Hoher Kontrast', 'Contraste élevé', 'Alto contraste', 'Contrasto elevato'],
-    ['Larger text', 'Texto más grande', 'Größerer Text', 'Texte agrandi', 'Texto maior', 'Testo più grande'],
     ['Left-handed tray', 'Bandeja para zurdos', 'Leiste für Linkshänder', 'Barre pour gauchers', 'Bandeja para canhotos', 'Barra per mancini'],
     ['Toggle instead of hold', 'Alternar en lugar de mantener', 'Umschalten statt halten', 'Basculer au lieu de maintenir', 'Alternar em vez de segurar', 'Alterna invece di tenere premuto'],
     ['Timing assist (stronger hints)', 'Ayuda de ritmo (pistas más claras)', 'Timing-Hilfe (deutlichere Hinweise)', 'Aide au timing (indices renforcés)', 'Ajuda de ritmo (dicas mais fortes)', 'Aiuto tempismo (suggerimenti più forti)'],
@@ -95,8 +84,6 @@
     ['depth {n}', 'profundidad {n}', 'Tiefe {n}', 'profondeur {n}', 'profundidade {n}', 'profondità {n}'],
     ['No dives yet. Yours will appear here; hosted boards compare with friends.', 'Aún no hay descensos. Los tuyos aparecerán aquí; con sesión iniciada se comparan con amigos.', 'Noch keine Tauchgänge. Deine erscheinen hier; angemeldet vergleichst du dich mit Freunden.', 'Aucune plongée pour l’instant. Les vôtres apparaîtront ici ; connecté, comparez-vous à vos amis.', 'Nenhuma descida ainda. As suas aparecem aqui; conectado, você compara com amigos.', 'Ancora nessun tuffo. I tuoi appariranno qui; con l’accesso ti confronti con gli amici.'],
     ['You ({name})', 'Tú ({name})', 'Du ({name})', 'Vous ({name})', 'Você ({name})', 'Tu ({name})'],
-    ['Player {id}', 'Jugador {id}', 'Spieler {id}', 'Joueur {id}', 'Jogador {id}', 'Giocatore {id}'],
-    ['WebGL is unavailable in this browser, so the 3D shaft cannot render. Your progress and settings are safe; try a browser with WebGL enabled.', 'WebGL no está disponible en este navegador, así que el pozo 3D no se puede mostrar. Tu progreso y configuración están a salvo; prueba un navegador con WebGL.', 'WebGL ist in diesem Browser nicht verfügbar, daher kann der 3D-Schacht nicht dargestellt werden. Fortschritt und Einstellungen sind sicher; probier einen Browser mit WebGL.', 'WebGL est indisponible dans ce navigateur : le puits 3D ne peut pas s’afficher. Votre progression et vos paramètres sont préservés ; essayez un navigateur avec WebGL.', 'O WebGL não está disponível neste navegador, então o poço 3D não pode ser exibido. Seu progresso e configurações estão seguros; tente um navegador com WebGL.', 'WebGL non è disponibile in questo browser, quindi il pozzo 3D non può essere mostrato. Progressi e impostazioni sono al sicuro; prova un browser con WebGL.'],
     // ---- intro
     ['Reach the core at the bottom of the shaft.', 'Alcanza el núcleo en el fondo del pozo.', 'Erreiche den Kern am Grund des Schachts.', 'Atteignez le noyau au fond du puits.', 'Alcance o núcleo no fundo do poço.', 'Raggiungi il nucleo in fondo al pozzo.'],
     ['{n} layers', '{n} capas', '{n} Schichten', '{n} couches', '{n} camadas', '{n} strati'],
@@ -184,7 +171,6 @@
     ['Space', 'Espacio', 'Leertaste', 'Espace', 'Espaço', 'Spazio'],
     ['Enter', 'Intro', 'Enter', 'Entrée', 'Enter', 'Invio'],
     ['Escape', 'Esc', 'Esc', 'Échap', 'Esc', 'Esc'],
-    ['({n}★ locked)', '({n}★ bloqueado)', '({n}★ gesperrt)', '({n}★ verrouillé)', '({n}★ bloqueado)', '({n}★ bloccato)'],
     // ---- captions
     ['dive start', 'inicio del descenso', 'Tauchstart', 'début de plongée', 'início da descida', 'inizio del tuffo'],
     ['hover', 'flotar', 'Schweben', 'vol stationnaire', 'pairar', 'fluttuazione'],
@@ -305,7 +291,25 @@
     ['New: a containment timer. Reach the core before it vents.', 'Novedad: un temporizador de contención. Alcanza el núcleo antes de que se libere.', 'Neu: ein Eindämmungs-Timer. Erreiche den Kern, bevor er entlüftet.', 'Nouveau : une minuterie de confinement. Atteignez le noyau avant la purge.', 'Novidade: um cronômetro de contenção. Alcance o núcleo antes que ele libere.', 'Novità: un timer di contenimento. Raggiungi il nucleo prima che sfiati.'],
     ['MASTERY: a long shaft and a ticking clock.', 'MAESTRÍA: un pozo largo y un reloj en marcha.', 'MEISTERSCHAFT: ein langer Schacht und eine tickende Uhr.', 'MAÎTRISE : un long puits et une horloge qui tourne.', 'MAESTRIA: um poço longo e um relógio correndo.', 'MAESTRIA: un pozzo lungo e un orologio che corre.'],
     ['MASTERY: fast rotation, long fall, hard timer.', 'MAESTRÍA: rotación rápida, caída larga, temporizador duro.', 'MEISTERSCHAFT: schnelle Drehung, langer Fall, harter Timer.', 'MAÎTRISE : rotation rapide, longue chute, minuterie serrée.', 'MAESTRIA: rotação rápida, queda longa, cronômetro duro.', 'MAESTRIA: rotazione rapida, caduta lunga, timer severo.'],
-    ['MASTERY: the definitive descent. Break the core.', 'MAESTRÍA: el descenso definitivo. Rompe el núcleo.', 'MEISTERSCHAFT: der ultimative Abstieg. Knack den Kern.', 'MAÎTRISE : la descente ultime. Brisez le noyau.', 'MAESTRIA: a descida definitiva. Quebre o núcleo.', 'MAESTRIA: la discesa definitiva. Spezza il nucleo.']
+    ['MASTERY: the definitive descent. Break the core.', 'MAESTRÍA: el descenso definitivo. Rompe el núcleo.', 'MEISTERSCHAFT: der ultimative Abstieg. Knack den Kern.', 'MAÎTRISE : la descente ultime. Brisez le noyau.', 'MAESTRIA: a descida definitiva. Quebre o núcleo.', 'MAESTRIA: la discesa definitiva. Spezza il nucleo.'],
+    // ---- the account line, invites and the leaderboard (js/main.js PT table before the engine port)
+    ['Offline — progress is stored on this device.', 'Sin conexión: el progreso se guarda en este dispositivo.', 'Offline – der Fortschritt wird auf diesem Gerät gespeichert.', 'Hors ligne : la progression est enregistrée sur cet appareil.', 'Offline — o progresso fica salvo neste dispositivo.', 'Offline: i progressi sono salvati su questo dispositivo.'],
+    ['Playing as {name}', 'Jugando como {name}', 'Du spielst als {name}', 'Vous jouez en tant que {name}', 'Jogando como {name}', 'Giochi come {name}'],
+    ['progress synced', 'progreso sincronizado', 'Fortschritt synchronisiert', 'progression synchronisée', 'progresso sincronizado', 'progressi sincronizzati'],
+    ['saving…', 'guardando…', 'wird gespeichert…', 'enregistrement…', 'salvando…', 'salvataggio…'],
+    ['cloud sync unavailable', 'sincronización en la nube no disponible', 'Cloud-Synchronisierung nicht verfügbar', 'synchronisation cloud indisponible', 'sincronização na nuvem indisponível', 'sincronizzazione cloud non disponibile'],
+    ['Invite link copied to the clipboard.', 'Enlace de invitación copiado al portapapeles.', 'Einladungslink in die Zwischenablage kopiert.', 'Lien d’invitation copié dans le presse-papiers.', 'Link de convite copiado para a área de transferência.', 'Link di invito copiato negli appunti.'],
+    ['Could not copy — invite link: {link}', 'No se pudo copiar. Enlace de invitación: {link}', 'Kopieren fehlgeschlagen – Einladungslink: {link}', 'Copie impossible — lien d’invitation : {link}', 'Não foi possível copiar — link de convite: {link}', 'Impossibile copiare. Link di invito: {link}'],
+    ['Posting score to the leaderboard…', 'Enviando la puntuación a la clasificación…', 'Punktzahl wird an die Bestenliste gesendet …', 'Envoi du score au classement…', 'Enviando a pontuação para o ranking…', 'Invio del punteggio alla classifica…'],
+    ['Leaderboard rank: #{rank}', 'Puesto en la clasificación: #{rank}', 'Platz in der Bestenliste: #{rank}', 'Rang au classement : #{rank}', 'Posição no ranking: #{rank}', 'Posizione in classifica: #{rank}'],
+    ['Score posted to the leaderboard.', 'Puntuación enviada a la clasificación.', 'Punktzahl an die Bestenliste gesendet.', 'Score envoyé au classement.', 'Pontuação enviada para o ranking.', 'Punteggio inviato alla classifica.'],
+    ['Score not posted to the leaderboard.', 'No se envió la puntuación a la clasificación.', 'Punktzahl nicht an die Bestenliste gesendet.', 'Score non envoyé au classement.', 'A pontuação não foi enviada para o ranking.', 'Punteggio non inviato alla classifica.'],
+    // ---- the engine port: the runtime's Options, the drawn ★ of locked themes, the gamepad, sign-out
+    ['(locked: {n} stars)', '(bloqueado: {n} estrellas)', '(gesperrt: {n} Sterne)', '(verrouillé : {n} étoiles)', '(bloqueado: {n} estrelas)', '(bloccato: {n} stelle)'],
+    ['Sound, graphics, language, controls, text size, high contrast and reduced motion are in the StarHermit Options.', 'El sonido, los gráficos, el idioma, los controles, el tamaño del texto, el alto contraste y el movimiento reducido están en las Opciones de StarHermit.', 'Ton, Grafik, Sprache, Steuerung, Textgröße, hoher Kontrast und reduzierte Bewegung findest du in den StarHermit-Optionen.', 'Le son, les graphismes, la langue, les commandes, la taille du texte, le contraste élevé et les animations réduites se trouvent dans les Options de StarHermit.', 'Som, gráficos, idioma, controles, tamanho do texto, alto contraste e movimento reduzido ficam nas Opções do StarHermit.', 'Audio, grafica, lingua, comandi, dimensione del testo, contrasto elevato e movimento ridotto si trovano nelle Opzioni di StarHermit.'],
+    ['Open Options', 'Abrir Opciones', 'Optionen öffnen', 'Ouvrir les Options', 'Abrir Opções', 'Apri Opzioni'],
+    ['Gamepad: {dive} dives, {toggle} toggles, {pause} pauses, {undo} undoes, {back} backs out.', 'Mando: {dive} baja, {toggle} alterna, {pause} pausa, {undo} deshace, {back} vuelve atrás.', 'Gamepad: {dive} taucht, {toggle} schaltet um, {pause} pausiert, {undo} macht rückgängig, {back} geht zurück.', 'Manette : {dive} plonge, {toggle} bascule, {pause} met en pause, {undo} annule, {back} revient en arrière.', 'Controle: {dive} desce, {toggle} alterna, {pause} pausa, {undo} desfaz, {back} volta.', 'Gamepad: {dive} si tuffa, {toggle} alterna, {pause} mette in pausa, {undo} annulla, {back} torna indietro.'],
+    ['Signed out of StarHermit — progress stays on this device.', 'Sesión de StarHermit cerrada: el progreso se queda en este dispositivo.', 'Von StarHermit abgemeldet – der Fortschritt bleibt auf diesem Gerät.', 'Déconnecté de StarHermit — la progression reste sur cet appareil.', 'Você saiu do StarHermit — o progresso fica neste dispositivo.', 'Disconnesso da StarHermit: i progressi restano su questo dispositivo.']
   ];
 
   var COLS = ['es-419', 'de-DE', 'fr-FR', 'pt-BR', 'it-IT'];
@@ -326,7 +330,9 @@
   T['es-ES'] = {
     'Not attempted yet today. One shared seed for everyone.': 'Aún no lo has intentado hoy. Una semilla compartida para todos.',
     'Mouse / touch: hold anywhere on the playfield (or the HOLD button) to dive; release to hover.': 'Ratón / táctil: mantén pulsado en cualquier parte de la zona de juego (o el botón MANTÉN) para bajar; suelta para flotar.',
-    'Dark Glass': 'Cristal oscuro'
+    'Dark Glass': 'Cristal oscuro',
+    'Could not copy — invite link: {link}': 'No se ha podido copiar. Enlace de invitación: {link}',
+    'Score not posted to the leaderboard.': 'No se ha enviado la puntuación a la clasificación.'
   };
   T['fr-CA'] = {
     'Score': 'Pointage',
@@ -334,8 +340,13 @@
     'Score Chase — Endless Shaft': 'Chasse au pointage — Puits sans fin',
     'Total score {n}.': 'Pointage total {n}.',
     'Completed today: core reached, best {score}. You can improve your score.': 'Réussi aujourd’hui : noyau atteint, record {score}. Vous pouvez améliorer votre pointage.',
-    'Completed today: attempt logged, best {score}. You can improve your score.': 'Joué aujourd’hui : tentative enregistrée, record {score}. Vous pouvez améliorer votre pointage.'
+    'Completed today: attempt logged, best {score}. You can improve your score.': 'Joué aujourd’hui : tentative enregistrée, record {score}. Vous pouvez améliorer votre pointage.',
+    'cloud sync unavailable': 'synchronisation infonuagique non disponible',
+    'Posting score to the leaderboard…': 'Envoi du pointage au classement…',
+    'Score posted to the leaderboard.': 'Pointage envoyé au classement.',
+    'Score not posted to the leaderboard.': 'Pointage non envoyé au classement.'
   };
 
   root.CB_STRINGS = T;
-})(typeof self !== 'undefined' ? self : this);
+  if (typeof module === 'object' && module.exports) module.exports = { CB_STRINGS: T };
+})(typeof globalThis !== 'undefined' ? globalThis : this);

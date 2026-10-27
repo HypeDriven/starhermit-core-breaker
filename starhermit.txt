@@ -1,14 +1,40 @@
 name=Core Breaker
 description=Smash through a rotating crystal tower, releasing before armored plates strike to reach the golden core.
-launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=score-script.js
 version=1.0.0
 contentVersion=1
 cover=cover.jpg
+
+# StarHermit engine script game: one package, played natively by the
+# StarHermit client and in browsers by the engine's web runtime. Browsers open
+# launch=index.html, the loader `npm run package` writes (it pins the engine
+# on wiki.starhermit.com by hash; never edit it). Re-run `npm run package`
+# after every change and commit index.html + starhermit-files.json.
+launch=index.html
+engine.api=1
+engine.entry=native/main.ts
+engine.version=1.16.0
+engine.minor=18
+engine.capabilities=platform,storage,clipboard
+
+# Keyboard controls (players rebind keys and pads in the runtime's Options).
+# Holding the pointer or a finger anywhere on the shaft, or the HOLD TO DIVE
+# button, dives too.
 control.dive=Space | Hold to dive
 control.toggle=Enter | Toggle dive / hover
 control.pause=KeyP | Pause / resume
 control.undo=KeyU | Undo
 control.retry=KeyR | Retry from results
 control.back=Escape | Back / close / pause
+engine.group.dive=Dive
+engine.group.undo=Round
+
+# Gamepad defaults for the same actions: hold A (or the right trigger) to
+# dive, X toggles, Y undoes, Start pauses, B backs out, Select retries.
+engine.gamepad.dive=South+RightTrigger
+engine.gamepad.toggle=West
+engine.gamepad.pause=Start
+engine.gamepad.undo=North
+engine.gamepad.retry=Select
+engine.gamepad.back=East

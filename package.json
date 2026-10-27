@@ -1,9 +1,16 @@
 {
   "name": "core-breaker",
   "private": true,
+  "description": "Core Breaker — a one-button crystal-shaft dive, on the StarHermit engine.",
   "scripts": {
-    "test:e2e": "node tests/e2e.mjs",
-    "test": "node tests/run_tests.js && node --test tests/gfx.test.js tests/platform.test.mjs tests/i18n.test.mjs"
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node tests/run_tests.js && node --test tests/session.test.mjs tests/i18n.test.mjs",
+    "test:native": "node tests/native.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "plays": "node tools/gen-plays.mjs",
+    "serve": "node server.js"
   },
   "devDependencies": {
     "playwright-core": "^1.62.1"

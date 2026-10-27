@@ -1,0 +1,33 @@
+# Challenges: Blitz Shaft (42 s containment timer, no undo) dived by the plan
+# to the core; the results show the planned total.
+until 300 Play
+frames 60
+click Challenges
+until 60 Blitz Shaft
+frames 20
+click Blitz Shaft
+until 60 Containment vents in 42 seconds
+frames 10
+click Start
+# c1 (seed 501): core-reached at tick 256, 5 commands, score 1370 (a tick early 1370 core-reached, late 1370 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+frames 215
+release Space
+frames 3
+hold Space
+frames 1
+release Space
+frames 3
+hold Space
+frames 30
+save challenge-diving
+until 600 Core Reached!
+release Space
+frames 10
+expect 1,370
+expect Time bonus
+frames 40
+save challenge-results

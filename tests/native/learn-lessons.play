@@ -1,0 +1,108 @@
+# Learn: a new pilot's Play opens lesson 1; each lesson is dived by the rules
+# bot's plan (node tools/gen-plays.mjs) to its results with the planned total,
+# then Next Stage opens the next lesson. Lesson 5 rewinds with U once.
+until 300 Play
+frames 60
+click =Play
+until 120 Hold to smash
+frames 10
+save lesson-1-intro
+click Start
+# t1 (seed 9001): core-reached at tick 96, 1 commands, score 210 (a tick early 210 core-reached, late 210 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+until 400 Core Reached!
+release Space
+frames 10
+expect 210
+frames 30
+click Next Stage
+until 120 Release for armor
+frames 10
+save lesson-2-intro
+click Start
+# t2 (seed 9002): core-reached at tick 132, 9 commands, score 210 (a tick early 210 core-reached, late 210 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+frames 29
+release Space
+frames 5
+hold Space
+frames 1
+release Space
+frames 4
+hold Space
+frames 1
+release Space
+frames 4
+hold Space
+frames 1
+release Space
+frames 3
+hold Space
+until 400 Core Reached!
+release Space
+frames 10
+expect 210
+frames 40
+save lesson-2-results
+frames 30
+click Next Stage
+until 120 Gaps keep your streak
+frames 10
+save lesson-3-intro
+click Start
+# t3 (seed 9003): core-reached at tick 92, 1 commands, score 125 (a tick early 125 core-reached, late 125 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+until 400 Core Reached!
+release Space
+frames 10
+expect 125
+frames 30
+click Next Stage
+until 120 Charge and overdrive
+frames 10
+save lesson-4-intro
+click Start
+# t4 (seed 9004): core-reached at tick 90, 1 commands, score 365 (a tick early 365 core-reached, late 365 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+until 400 Core Reached!
+release Space
+frames 10
+expect 365
+frames 30
+click Next Stage
+until 120 Second chances
+frames 10
+save lesson-5-intro
+click Start
+# t5 (seed 9005): core-reached at tick 135, 4 commands, score 235 (a tick early 235 core-reached, late 235 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+frames 30
+release Space
+frames 28
+key KeyU 1
+frames 18
+hold Space
+until 400 Core Reached!
+release Space
+frames 10
+expect 235
+frames 30
+click Exit to Title
+until 120 Daily Challenge
+frames 10
+save title-after-lessons

@@ -1,0 +1,94 @@
+# The menus by pointer and keys: How to Play and Settings (a game option
+# toggled and back), Daily Challenge with its shared shaft's facts, Practice
+# (Calm: a random shaft, started, paused, restarted and left), Challenges,
+# and Score Chase dived (held) until the armour ends it, with the device
+# board on the Score Chase screen afterwards.
+until 300 Play
+frames 60
+save title
+click How to Play
+until 60 Charge & overdrive
+frames 20
+save help
+click Close
+until 60 Daily Challenge
+frames 10
+click Settings
+until 60 Toggle instead of hold
+frames 20
+click Toggle instead of hold
+frames 10
+save settings
+click Toggle instead of hold
+frames 10
+click Done
+until 60 Daily Challenge
+frames 10
+click Daily Challenge
+until 60 One shared seed for everyone
+frames 20
+save daily
+click Back
+until 60 Score Chase
+frames 10
+click Practice
+until 60 Unranked
+frames 20
+save practice
+click Calm
+until 60 local best only
+frames 10
+click Start
+frames 5
+until 300 =1
+frames 60
+hold Space
+frames 30
+release Space
+frames 10
+key Escape 1
+until 60 Leave Round
+frames 10
+save practice-paused
+click Restart
+frames 5
+until 300 =1
+frames 60
+key KeyP 1
+until 60 Leave Round
+frames 10
+click Leave Round
+until 60 Daily Challenge
+frames 10
+click Challenges
+until 60 Glass Gauntlet
+frames 20
+save challenges
+key Escape 1
+until 60 Score Chase
+frames 10
+click Score Chase
+until 60 Start Endless Dive
+frames 20
+save score-screen
+click Start Endless Dive
+until 60 Play until you crash
+frames 10
+click Start
+frames 5
+until 300 =1
+frames 60
+hold Space
+until 3000 Dive Over
+release Space
+frames 20
+expect armor impact
+save score-results
+click Exit to Title
+until 60 Score Chase
+frames 10
+click Score Chase
+until 60 Start Endless Dive
+expect depth
+frames 20
+save score-board

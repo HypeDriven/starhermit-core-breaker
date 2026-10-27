@@ -1,0 +1,49 @@
+# Journey: stage 1 from the grid, dived by the plan to the core under par
+# (two stars), Retry, then Pause → Leave Round, the grid shows the stars and
+# opens stage 2; its intro offers Next Stage's stage and Cancel returns.
+until 300 Play
+frames 60
+click Journey
+until 60 40 authored descents
+frames 20
+click =1
+until 60 First Descent
+frames 10
+save journey-intro
+click Start
+# j01 (seed 101): core-reached at tick 175, 1 commands, score 710 (a tick early 710 core-reached, late 710 core-reached)
+frames 5
+until 300 =1
+frames 44
+hold Space
+frames 60
+save journey-diving
+until 400 Core Reached!
+release Space
+frames 10
+expect 710
+expect par beaten
+expect Par beaten
+frames 40
+save journey-results
+click Retry
+until 300 =1
+frames 60
+key Escape 1
+until 30 Leave Round
+frames 10
+save journey-paused
+click Leave Round
+until 60 Daily Challenge
+frames 10
+click Journey
+until 60 40 authored descents
+frames 20
+save journey-grid-stars
+click =2
+until 60 Crystal Veins
+frames 10
+click Cancel
+frames 10
+key Escape 1
+until 60 Daily Challenge
