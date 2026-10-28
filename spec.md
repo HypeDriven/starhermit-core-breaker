@@ -11,7 +11,7 @@
 | Genre | One-button timing action (hold/release), score attack |
 | Players | 1, offline-capable; scores compared on device-local boards (plus the platform board when signed in) |
 | Session | A round lasts 5–60 s (3-layer lessons to the 40-layer Long Core); a typical sitting is 5–15 min of retries and next-stage chaining |
-| Platforms | The StarHermit engine 1.19.1 (host API 1.21): natively in the StarHermit client and in browsers through the engine's web runtime; keyboard, mouse, touch and gamepad |
+| Platforms | The StarHermit engine 1.22.0 (host API 1.21): natively in the StarHermit client and in browsers through the engine's web runtime; keyboard, mouse, touch and gamepad |
 | Rendering | `starhermit:scene` (three.js-like) for the shaft; every menu, the HUD and the dialogs on `starhermit:ui` (immediate mode, styled from the converted CSS) |
 | Simulation | Pure deterministic rules engine, fixed 60 Hz tick (the runtime's fixed steps), integer fixed-point; replays hash-verifiable (`server.js`) |
 
@@ -19,7 +19,7 @@
 
 | Path | Responsibility |
 |---|---|
-| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.19.1`, `engine.minor=18`, capabilities `platform,storage,clipboard`, `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
+| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.22.0`, `engine.minor=18`, capabilities `platform,storage,clipboard`, `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
 | `index.html`, `starhermit-files.json` | The engine's web loader and file index, written by `npm run package` (`starhermit package --web .`); never edited by hand |
 | `native/main.ts` | Entry: the screen/overlay state machine, the round lifecycle on fixed steps (countdown, ticks, the 900 ms settle), hold/release/undo commands with their replay log, lesson goals, results, progression, achievements, the Score Chase device board, input routing, lifecycle |
 | `native/screens.ts` | Every screen, overlay, the HUD, hint pill, captions, toast and the action tray on `starhermit:ui`; layouts by window size; drawn glyphs (★, lock, ♪, ∞); the key art and results art |
