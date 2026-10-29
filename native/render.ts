@@ -13,10 +13,10 @@
 // shard and mote budgets and the animated surround. Reduced motion freezes
 // the striker spin, camera drift and shake, motes and pulses.
 //
-// From three.js: light intensities in the engine's units (÷ π); the post
-// chain (GTAO, UnrealBloom, the grade shader, SMAA/FXAA) is renderer.ao /
-// bloom / grade / antialias; the shadow box fitted to the window is the
-// directional light's shadow distance; the procedural canvas textures are
+// From three.js r160: the page's light intensities and shadow box (engine
+// minor 28); the post chain (GTAO, UnrealBloom, the grade shader, SMAA/FXAA)
+// is renderer.ao / bloom / grade / antialias; per-material envMaps stand for
+// r160's envMapIntensity on scene.environment; the procedural canvas textures are
 // OffscreenCanvas from starhermit:canvas (without the vein glow's canvas
 // shadowBlur, drawn as a wider faint stroke under the bright one).
 import {
@@ -24,7 +24,7 @@ import {
   CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, IcosahedronGeometry, Mesh, MeshBasicMaterial,
   MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, OctahedronGeometry, PMREMGenerator, PerspectiveCamera,
   PointLight, Points, PointsMaterial, RepeatWrapping, RoomEnvironment, RoundedBoxGeometry, SRGBColorSpace, Vector3,
-  renderer, scene, type Texture,
+  renderer, scene, type OrthographicCamera, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Content, RNG, type RulesEvent, type State, type Theme } from "./classic.ts";
@@ -41,7 +41,6 @@ const WINDOW_ABOVE = 3, WINDOW_BELOW = 12;
 const WALL_R = 11, WALL_H = 70;
 const PI = Math.PI;
 /** three.js's physically based intensities in the engine's units. */
-const K = 1 / PI;
 
 type Palette = Theme["palette"];
 
@@ -63,16 +62,17 @@ let clock = 0;
 const avRng = RNG.create(12345);
 
 // ---------------------------------------------------------------- lights and fixtures
-const keyLight = new DirectionalLight(0xffffff, 1.8 * K);
+const keyLight = new DirectionalLight(0xffffff, 1.8);
 const KEY_TARGET = new Vector3(0, -6, 0);
 keyLight.target.position.copy(KEY_TARGET);
 keyLight.position.copy(KEY_TARGET).addScaledVector(new Vector3(4, 8, 6).normalize(), 30);
 keyLight.shadow.bias = -0.0006;
-keyLight.shadow.distance = 45;
+keyLight.shadow.normalBias = 0.02;
+fitShadow();
 scene.add(keyLight);
 scene.add(keyLight.target);
-const fillLight = new HemisphereLight(0x8888ff, 0x221133, 0.55 * K);
-const rimLight = new DirectionalLight(0x9be8ff, 0.9 * K);
+const fillLight = new HemisphereLight(0x8888ff, 0x221133, 0.55);
+const rimLight = new DirectionalLight(0x9be8ff, 0.9);
 rimLight.position.set(-5, 2, -7);
 scene.add(fillLight);
 scene.add(rimLight);
@@ -90,7 +90,7 @@ striker.position.set(0, STRIKER_Y, RADIUS);
 striker.castShadow = true;
 scene.add(striker);
 // The glow light sits at the striker's centre: it lights the crystal around it, not the striker's own faces.
-const strikerLight = new PointLight(0x9be8ff, 1 * K, 4, 2);
+const strikerLight = new PointLight(0x9be8ff, 1, 4, 2);
 strikerLight.position.copy(striker.position);
 scene.add(strikerLight);
 
@@ -103,8 +103,33 @@ const pips: { mesh: Mesh; mat: MeshBasicMaterial }[] = [];
 const coreMat = new MeshStandardMaterial({ color: 0xffd166, emissive: 0xffd166, emissiveIntensity: 1.3, roughness: 0.3 });
 const coreGlow = new Mesh(new CylinderGeometry(RADIUS * 0.8, RADIUS * 0.9, 0.4, 32), coreMat);
 shaftGroup.add(coreGlow);
-const coreLight = new PointLight(0xffd166, 30 * K, 14, 1.4);
+const coreLight = new PointLight(0xffd166, 30, 14, 1.4);
 shaftGroup.add(coreLight);
+
+/** js/render.js fitShadow: the rendered window (3 layers above to 12 below, ring plus striker) in light space. */
+function fitShadow(): void {
+  const pos = keyLight.position, z = pos.clone().sub(KEY_TARGET).normalize();
+  const x = new Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x);
+  const e = RADIUS + SEG_W * 0.5 + 0.2, ys = [STRIKER_Y + WINDOW_ABOVE * LAYER_H, STRIKER_Y - WINDOW_BELOW * LAYER_H - 1];
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const xi of [-1, 1]) for (const yv of ys) for (const zi of [-1, 1]) {
+    const v = new Vector3(xi * e, yv, zi * e).sub(pos);
+    const c = [v.dot(x), v.dot(y), v.dot(z)];
+    for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i]!, c[i]!); hi[i] = Math.max(hi[i]!, c[i]!); }
+  }
+  const cam = keyLight.shadow.camera as OrthographicCamera;
+  cam.left = lo[0]!; cam.right = hi[0]!; cam.bottom = lo[1]!; cam.top = hi[1]!;
+  cam.near = Math.max(0.1, -hi[2]! - 1); cam.far = -lo[2]! + 1;
+  cam.updateProjectionMatrix();
+}
+
+/** r160 scaled scene.environment by each material's envMapIntensity: give every lit material its own envMap. */
+function applyEnvMaps(): void {
+  const env = look && look.reflections ? envTex : null;
+  const list: unknown[] = [strikerMat, coreMat];
+  if (mats) for (const d of [mats.plain, mats.detailed]) list.push(d.safe, d.armor);
+  for (const m of list) if (m instanceof MeshStandardMaterial || m instanceof MeshPhysicalMaterial) m.envMap = env;
+}
 
 // ---------------------------------------------------------------- procedural textures
 function canvasTex(w: number, h: number, paint: (g: OffscreenCanvasRenderingContext2D, w: number, h: number) => void, k = 1): Texture {
@@ -368,6 +393,7 @@ export function applyLook(next: Look): void {
     }
     scene.environment = envTex;
   } else scene.environment = null;
+  applyEnvMaps();
   (mats!.plain.armor as MeshStandardMaterial).metalness = scene.environment ? 0.8 : 0.55;
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.7, radius: 0.6, distanceExponent: 1.5, thickness: 1.0, scale: 1.0, samples: next.ao === "high" ? 16 : 8, resolution: b.aoRes,
@@ -558,7 +584,7 @@ export function render(state: State | null, dt: number, width: number, height: n
     // striker: bright while holding, dim while hovering
     const targetEm = state.holding ? 0.6 : 0.22;
     strikerMat.emissiveIntensity += (targetEm - strikerMat.emissiveIntensity) * Math.min(1, dt * 12);
-    strikerLight.intensity = (0.3 + strikerMat.emissiveIntensity) * K;
+    strikerLight.intensity = (0.3 + strikerMat.emissiveIntensity);
     if (!reducedMotion) striker.rotation.y += dt * (state.holding ? 6 : 1.5);
     syncPips(state);
     // the camera follows a touch as depth grows
@@ -579,7 +605,7 @@ export function render(state: State | null, dt: number, width: number, height: n
   beamMat.opacity = 0.1 + (moving ? Math.sin(clock * 3) * 0.04 : 0);
   coreLight.position.copy(coreGlow.position);
   coreLight.position.y += 1.2;
-  coreLight.intensity = (coreGlow.visible ? 30 : 0) * K; // intensity, not visibility: the light count stays fixed
+  coreLight.intensity = (coreGlow.visible ? 30 : 0); // intensity, not visibility: the light count stays fixed
   coreMat.emissiveIntensity = 1.3 + (moving ? Math.sin(clock * 2.2) * 0.3 : 0);
   if (motes.visible && moving) {
     const n = look.budget.motes;
