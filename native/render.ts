@@ -400,12 +400,12 @@ export function applyLook(next: Look): void {
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
   // High threshold: only the striker, core, charged pips, shard bursts, crystal veins and chevrons bloom.
-  // minor 29 bloom follows r185's UnrealBloomPass; this page ran three r160, so the strength is squared (0.38² ≈ 0.144) to keep its look.
-  renderer.bloom = next.bloom ? { strength: 0.144, radius: 0.35, threshold: 0.9, resolution: b.bloomRes } : null;
+  // r160 page: its UnrealBloomPass(0.38, 0.35, 0.9) exactly (model "r160", strength as written).
+  renderer.bloom = next.bloom ? { model: "r160", strength: 0.38, radius: 0.35, threshold: 0.9, resolution: b.bloomRes } : null;
   // The browser build's grade pass (before OutputPass, so on clamped linear light): a gentle S-curve, +12 % saturation,
   // cool shadows / warm highlights, the 0.28 vignette.
   renderer.grade = next.grade ? {
-    space: "linear", contrast: 0.22, saturation: 1.12,
+    space: "linear", contrastCurve: "s", contrast: 0.22, saturation: 1.12,
     shadows: [0.95, 0.97, 1.06], highlights: [1.04, 1.0, 0.96], split: [0.2, 0.8],
     vignette: { amount: 0.28, inner: 0.38, outer: 0.9 },
   } : null;
