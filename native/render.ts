@@ -385,7 +385,7 @@ export function applyLook(next: Look): void {
   const shadows = next.shadows > 0;
   renderer.shadowMap.enabled = shadows;
   keyLight.castShadow = shadows;
-  if (shadows) keyLight.shadow.mapSize = next.shadows;
+  if (shadows) keyLight.shadow.mapSize = next.shadows; // the level's size: at minor 23+ the engine keeps the game's mapSize
   if (next.reflections) {
     if (!envTex) {
       try {
@@ -397,13 +397,14 @@ export function applyLook(next: Look): void {
   } else scene.environment = null;
   applyEnvMaps();
   (mats!.plain.armor as MeshStandardMaterial).metalness = scene.environment ? 0.8 : 0.55;
-  renderer.ao = next.ao === "off" ? null : {
-    blendIntensity: 0.7, radius: 0.6, distanceExponent: 1.5, thickness: 1.0, scale: 1.0, samples: next.ao === "high" ? 16 : 8, resolution: b.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  const ao = next.ao, fullAo = !!ao && ao.resolution >= 1; // the engine's "high" AO: full resolution
+  renderer.ao = ao && {
+    blendIntensity: 0.7, radius: 0.6, distanceExponent: 1.5, thickness: 1.0, scale: 1.0, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: fullAo ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // High threshold: only the striker, core, charged pips, shard bursts, crystal veins and chevrons bloom.
   // r160 page: its UnrealBloomPass(0.38, 0.35, 0.9) exactly (model "r160", strength as written).
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.38, radius: 0.35, threshold: 0.9, resolution: b.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { model: "r160", strength: 0.38, radius: 0.35, threshold: 0.9, resolution: next.bloom };
   // The browser build's grade pass (before OutputPass, so on clamped linear light): a gentle S-curve, +12 % saturation,
   // cool shadows / warm highlights, the 0.28 vignette.
   renderer.grade = next.grade ? {

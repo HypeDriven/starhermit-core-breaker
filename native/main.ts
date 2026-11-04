@@ -18,7 +18,7 @@
 // pause, a hidden window or a slow frame never moves the shaft. The countdown
 // (700 ms a numeral) and the settle before results are counted in the same
 // steps, so play scripts replay exactly.
-import { frame, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { frame, levelSettings, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { onAction, onPointerButton } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded } from "starhermit:platform";
@@ -543,10 +543,10 @@ function pointerInput(): void {
 let lookKey = "";
 function applyLook(): void {
   const f = frame();
-  const key = `${f.quality}:${f.levelIndex}`;
+  const key = f.level;
   if (key === lookKey) return;
   lookKey = key;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 function applyPrefs(): void {
   const p = preferences();

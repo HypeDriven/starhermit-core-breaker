@@ -1,0 +1,36 @@
+# Tier bench (tools/engine-tier-bench.mjs): journey stage 1 (seed 101, a
+# fixed shaft) dived three times through Retry, as journey-stage.play does:
+# falling segments, shard bursts, motes, the core and beam.
+until 300 Play
+frames 60
+click Journey
+until 60 40 authored descents
+frames 20
+click =1
+until 60 First Descent
+frames 10
+click Start
+frames 5
+until 300 =1
+frames 120
+measure start
+frames 180
+hold Space
+until 900 Retry
+release Space
+frames 30
+click Retry
+until 300 =1
+frames 240
+hold Space
+until 900 Retry
+release Space
+frames 30
+click Retry
+until 300 =1
+frames 240
+hold Space
+until 900 Retry
+release Space
+frames 30
+measure stop
