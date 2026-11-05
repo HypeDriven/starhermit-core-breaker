@@ -79,10 +79,7 @@ export function lookFor(s: LevelSettings = levelSettings()): Look {
     ao: s.ao && { resolution: s.ao.resolution, samples: s.ao.samples, denoiseSamples: s.ao.denoiseSamples },
     bloom: s.bloom ? s.bloom.resolution : null,
     grade: s.grade,
-    // Engine issue (1.36.1, reported): with antialias "off" the shaft draws washed out
-    // (lighter background, desaturated segments, no golden core) in portrait windows, so
-    // Low keeps the MSAA it always had; the other levels take the level's anti-aliasing.
-    antialias: s.antialias === "off" ? "msaa" : s.antialias,
+    antialias: s.antialias,
     budget: {
       ...b, texture: Math.min(b.texture, s.maxTextureSize),
       motes: Math.min(MOTE_MAX, Math.round(b.motes * k)),
