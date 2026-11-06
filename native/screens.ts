@@ -27,17 +27,15 @@ import {
   app, canUndo, closeOverlay, countdownLeft, countingDown, dailyDate, doUndo, goBack, holdEnd, holdStart, holding, hudBest,
   liveScore, localBoard, nextStage, objectiveText, openIntro, openLearn, openOverlay, openPlay, pauseGame, playCfg, playCtx,
   playKind, playState, quitToTitle, reasonText, restart, resumeGame, retry, settings, showScreen, startDaily, startPlay,
-  startPractice, startScoreChase,
+  startPractice, startScoreChase, toast,
 } from "./main.ts";
 import { COLORS, COLORS_HC } from "./style.ts";
 
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; wide: boolean; narrow: boolean; shortLand: boolean }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const sc = v.scale, lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   return { lw, lh, sc, wide: lw >= 1024, narrow: lw <= 700, shortLand: lw > lh && lh <= 500 };
 }
 const colors = (): typeof COLORS => (ui.preferences().highContrast ? COLORS_HC : COLORS);
@@ -203,13 +201,6 @@ export function drawScreens(): void {
     case "help": helpOverlay(L); break;
     default: break;
   }
-  if (app.toast) {
-    const text = app.toast.text();
-    const w = Math.min(L.lw - 32, 560);
-    ui.place("toast", { anchor: "top", y: 64 }, () => {
-      ui.column("toast-box", () => { para(text, w - 44, "toast-text", "toast-text", true); }, { style: "toast", align: "center" });
-    });
-  }
 }
 
 // ------------------------------------------------------------------ cards
@@ -330,14 +321,14 @@ function titleScreen(L: Layout): void {
       const link = platform.inviteLink();
       if (link) {
         account.push({
-          id: "btn-invite", text: T("Invite a friend"),
+          id: "btn-invite", text: T("starhermit.invite"),
           act: () => {
-            try { clipboard.writeText(link); app.toast = { text: () => T("Invite link copied to the clipboard."), until: frame().time + 2.6 }; }
-            catch { app.toast = { text: () => T("Could not copy — invite link: {link}", { link }), until: frame().time + 6 }; }
+            try { clipboard.writeText(link); toast(T("starhermit.inviteCopied")); }
+            catch { toast(T("starhermit.inviteLink", { link }), 6); }
           },
         });
       }
-      if (!platform.signedIn()) account.push({ id: "btn-signin", text: T("Sign in with StarHermit"), act: () => { void requestSignIn().catch(() => undefined); } });
+      if (!platform.signedIn()) account.push({ id: "btn-signin", text: T("starhermit.signIn"), act: () => { void requestSignIn().catch(() => undefined); } });
       if (account.length) flow("title-account", account, w, "center");
       para(titleProgress(), w, "small", "title-progress", true);
       para(accountLine(), w, "small", "account-line", true);
@@ -595,8 +586,8 @@ function resultsOverlay(L: Layout): void {
     }
     const lb = app.lb;
     if (lb) {
-      para(lb === "posting" ? T("Posting score to the leaderboard…") : !lb.posted ? T("Score not posted to the leaderboard.")
-        : lb.rank ? T("Leaderboard rank: #{rank}", { rank: lb.rank }) : T("Score posted to the leaderboard."), w, "small", "res-leaderboard");
+      para(lb === "posting" ? T("starhermit.leaderboardPosting") : !lb.posted ? T("starhermit.leaderboardNotPosted")
+        : lb.rank ? T("starhermit.leaderboardRank", { rank: lb.rank }) : T("starhermit.leaderboardPosted"), w, "small", "res-leaderboard");
     }
     para(T("Replay hash {hash} · seed {seed} · {n} commands", { hash: R.replay.hash.toString(16), seed: R.replay.seed, n: R.commands }), w, "small", "res-replay");
   }, {

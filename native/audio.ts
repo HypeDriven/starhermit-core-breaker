@@ -11,14 +11,14 @@
 // the hum → "effects", the menu tick and the countdown beeps → "interface";
 // the old default bus levels (music 40 %, effects 80 %, ambience 35 %) are
 // folded into each sound's gain. The hum and the music's notes are rendered
-// once into clips (createClip) with the old oscillators' shapes and
+// once into clips (OfflineAudioContext) with the old oscillators' shapes and
 // envelopes; the procedural stand-ins the browser build played while a clip
 // decoded are not ported (a live synthesis graph makes clip loads fail on the
 // engine's web runtime; the arrow-exodus port's finding), so a missing clip
 // is silent. The one-shot clips all load at once in onStart (every loaded
 // clip reaches the mixer, natively and on the web); the hum and the music
 // start once the mixer runs (in a browser after the first press).
-import { context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
+import { context, createClip, loadClip, OfflineAudioContext, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
 
 /** Marks an English caption key (translated where it is shown). */
 const N = (s: string): string => s;
@@ -42,11 +42,12 @@ const INTERFACE = new Set<Cue>(["ui", "countdown"]);
 const clips = new Map<string, AudioClip>();
 let onCaption: ((key: string, vars: Record<string, string | number>) => void) | null = null;
 
-/** Loads every clip at once (onStart); a cue whose clip is still loading is skipped. */
+/** Loads every clip at once and renders the tones (onStart); a cue whose clip is still loading is skipped. */
 export function loadSfx(): void {
   for (const name of new Set(Object.values(SAMPLES))) {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
+  renderTones().catch((e: unknown) => console.warn(`audio: ${String(e)}`));
 }
 /** cb(captionKey, vars) for each captioned cue (an English key; "crystal break ×{n}" carries n). */
 export function setOnCaption(cb: (key: string, vars: Record<string, string | number>) => void): void { onCaption = cb; }
@@ -68,31 +69,42 @@ export function cue(name: Cue, mult = 1): void {
 // -- rendered tones ----------------------------------------------------------------------
 const RATE = 22050;
 type Wave = "sine" | "triangle" | "sawtooth";
-function wave(type: Wave, ph: number): number {
-  if (type === "sine") return Math.sin(2 * Math.PI * ph);
-  const f = ph - Math.floor(ph);
-  return type === "triangle" ? 4 * Math.abs(f - 0.5) - 1 : 2 * f - 1;
-}
 /** An oscillator note with js/audio.js's envelope: peak 1 at once, exponential to 0.001 over `dur`. */
-function noteClip(freq: number, type: Wave, dur: number): AudioClip {
-  const n = Math.round((dur + 0.02) * RATE);
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / RATE;
-    const env = t < dur ? Math.pow(0.001, t / dur) : 0;
-    out[i] = wave(type, freq * t) * env * (type === "sawtooth" ? 0.6 : 1);
-  }
-  return createClip([out], RATE);
+async function renderNote(freq: number, type: Wave, dur: number): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, Math.round((dur + 0.02) * RATE), RATE);
+  const osc = off.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  // The old saw was 0.6; its sharper attack at the note's peak measured 1.55 dB above the oscillator's, so make-up.
+  const level = type === "sawtooth" ? 0.717 : 1;
+  const gain = off.createGain();
+  gain.gain.setValueAtTime(level, 0);
+  gain.gain.exponentialRampToValueAtTime(0.001 * level, dur);
+  gain.gain.setValueAtTime(0, dur);
+  osc.connect(gain).connect(off.destination);
+  osc.start();
+  const r = await off.startRendering();
+  return createClip(r);
 }
 /** The reactor hum: 2 s that loop seamlessly (108 and 217 whole cycles). */
-function humClip(): AudioClip {
-  const n = 2 * RATE;
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / RATE;
-    out[i] = (wave("sine", 54 * t) + wave("triangle", 108.5 * t)) * 0.5;
+async function renderHum(): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, 2 * RATE, RATE);
+  const mix = off.createGain();
+  mix.gain.value = 0.5;
+  for (const [type, f] of [["sine", 54], ["triangle", 108.5]] as const) {
+    const osc = off.createOscillator();
+    osc.type = type;
+    osc.frequency.value = f;
+    osc.connect(mix);
+    osc.start();
   }
-  return createClip([out], RATE);
+  mix.connect(off.destination);
+  const r = await off.startRendering();
+  return createClip(r);
+}
+async function renderTones(): Promise<void> {
+  hum = await renderHum();
+  for (const [k, f, type, d] of NOTE_LIST) notes.set(k, await renderNote(f, type, d));
 }
 
 // -- the pulse music ---------------------------------------------------------------------
@@ -111,7 +123,6 @@ let musicOn = false;
 let intensity = 0;
 let step = 0;
 let nextStep = 0;
-let nextRender = 0;
 let paused = false;
 
 export function startMusic(): void { if (!musicOn) { musicOn = true; step = 0; nextStep = 0; } }
@@ -127,17 +138,10 @@ export function stopAmbience(): void {
 /** Hidden window: music holds and the hum stops (as the browser build did). */
 export function setPaused(on: boolean): void { paused = on; }
 
-/** Each frame once the mixer runs: the rendered notes one each half second,
- * the hum, then the music's steps by mixer time. */
+/** Each frame once the mixer runs: the hum, then the music's steps by mixer time. */
 export function update(): void {
   if (context.state !== "running") return; // starting the hum and music still waits for the mixer
   try {
-    if (context.currentTime >= nextRender) {
-      if (!hum) { hum = humClip(); nextRender = context.currentTime + 0.5; return; }
-      for (const [k, f, type, d] of NOTE_LIST) {
-        if (!notes.has(k)) { notes.set(k, noteClip(f, type, d)); nextRender = context.currentTime + 0.5; return; }
-      }
-    }
     const humOn = wantHum && !paused;
     if (humOn && hum && !humSound) humSound = playClip(hum, { bus: "effects", gain: 0.05 * 2 * LEVEL.ambience, loop: true });
     else if (!humOn && humSound) { try { humSound.stop(); } catch { /* gone */ } humSound = null; }

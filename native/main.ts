@@ -52,7 +52,6 @@ export const app = {
   /** Frame the screen or overlay opened on (the key that opened it must not also close it). */
   openedFrame: 0,
   focusNext: false,
-  toast: null as { text: () => string; until: number } | null,
   caption: null as { key: string; vars: Record<string, string | number>; until: number } | null,
   results: null as ResultsView | null,
   lb: null as LbState,
@@ -83,8 +82,12 @@ const now = (): number => frame().time;
 export function announce(msg: string, assertive = false): void {
   if (msg) ui.announce(msg, { politeness: assertive ? "assertive" : "polite" });
 }
-/** A toast; `text` re-runs each frame so a visible toast follows a language change. */
-export function toast(text: () => string, seconds = 2.6): void { app.toast = { text, until: now() + seconds }; }
+/** A toast, one at a time, 64 px from the top (the stack's margin is 16); the game announces its own. */
+let shownToast: ui.Toast | null = null;
+export function toast(text: string, seconds = 2.6): void {
+  shownToast?.dismiss();
+  shownToast = ui.toast!(text, { duration: seconds, style: ["toast", "toast-text"], dismissible: false, announce: false, position: "top", offset: 48 });
+}
 audio.setOnCaption((key, vars) => {
   if (!settings.captions) return;
   app.caption = { key, vars, until: now() + 1.4 };
@@ -286,7 +289,7 @@ function checkLessonGoal(e: RulesEvent): void {
     Session.markTutorialDone(lesson.id);
     const msg = (): string => T("Lesson complete: {title}", { title: T(lesson.title) });
     announce(msg(), true);
-    toast(msg);
+    toast(msg());
     audio.cue("lesson");
   }
 }
@@ -413,7 +416,7 @@ function tryUnlock(key: string): void {
   if (!Session.unlockAchievement(key, Date.now())) return;
   const meta = Content.ACHIEVEMENTS.find((a) => a.key === key);
   if (!meta) return;
-  toast(() => T("Achievement: {name}", { name: T(meta.name) }));
+  toast(T("Achievement: {name}", { name: T(meta.name) }));
   announce(T("Achievement unlocked: {name}. {desc}", { name: T(meta.name), desc: T(meta.desc) }));
   audio.cue("achievement");
 }
@@ -568,7 +571,7 @@ onStart(() => {
 });
 onPreferencesChange(() => applyPrefs());
 platform.onProgressMerged(() => undefined);
-onSessionEnded(() => { toast(() => T("Signed out of StarHermit — progress stays on this device."), 4); });
+onSessionEnded(() => { toast(T("starhermit.signedOut"), 4); });
 onSuspend(() => {
   // Backgrounding pauses an active round (not its countdown) and stops the hum.
   if (playState && !playState.terminal && !paused && !countingDown) pauseGame();
@@ -590,7 +593,6 @@ onUpdate((dt) => {
   applyLook();
   audio.update();
   const t = now();
-  if (app.toast && t > app.toast.until) app.toast = null;
   if (app.caption && t > app.caption.until) app.caption = null;
 });
 onRender(() => {

@@ -1,14 +1,14 @@
 // The browser build's pure game scripts, shared unchanged with the node tests
 // and server.js: the seeded streams (js/rng.js), the deterministic rules
 // engine (js/rules.js), the content (js/content.js: themes, Journey,
-// challenges, practice presets, the daily, lessons, achievements), the
-// string tables (js/strings.js, js/i18n.js) and the progress document
+// challenges, practice presets, the daily, lessons, achievements) and the
+// progress document
 // (js/session.js), evaluated as classic scripts so their globals are this
 // module's exports. js/session.js keeps its document in `localStorage`:
 // platform.ts puts a shim there whose progress key is the game's save.
 import { loadClassic } from "starhermit:script";
 
-for (const f of ["js/rng.js", "js/rules.js", "js/content.js", "js/strings.js", "js/i18n.js", "js/session.js"]) loadClassic(f);
+for (const f of ["js/rng.js", "js/rules.js", "js/content.js", "js/session.js"]) loadClassic(f);
 
 // -- The shapes this client reads -------------------------------------------------
 export type Seg = 0 | 1 | 2;
@@ -89,16 +89,9 @@ interface RngApi {
   create(seed: number): { next(): number; int(n: number): number };
   hashString(s: string): number;
 }
-interface I18nApi {
-  T(key: string, vars?: Record<string, string | number> | null): string;
-  setLocale(tag: string): string;
-  readonly lang: string;
-  locales: string[];
-}
 
-const g = globalThis as unknown as { CBRules: RulesApi; CBContent: ContentApi; CBSession: SessionApi; CBRNG: RngApi; CBI18N: I18nApi };
+const g = globalThis as unknown as { CBRules: RulesApi; CBContent: ContentApi; CBSession: SessionApi; CBRNG: RngApi };
 export const Rules = g.CBRules;
 export const Content = g.CBContent;
 export const Session = g.CBSession;
 export const RNG = g.CBRNG;
-export const I18n = g.CBI18N;
