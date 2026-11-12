@@ -296,3 +296,11 @@ Nine locales ship: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it
 - Delivering achievements through the platform.
 - Per-stage HUD best in Journey and per-date daily boards.
 - Suppressing particle bursts under reduced motion.
+
+<!-- regional-localization:start -->
+
+### Regional interface languages
+
+The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `zh-HK`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `id-ID`, `vi-VN`, `ta-SG`, `da-DE`, `lb-BE`, `oc-FR`, `sl-IT`, `fur-IT`, `oc-IT`, `ru-FI`, `gl-ES`, `ru-EE`, `su-ID`, `km-VN`, `co-FR`, `eu-FR`, `ca-FR`, `ca-IT`, `ca-ES`, `eu-ES`, `bew-ID`.
+
+<!-- regional-localization:end -->

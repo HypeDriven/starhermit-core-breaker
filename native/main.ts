@@ -1,3 +1,4 @@
+import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Core Breaker on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
 // the engine's web runtime. The rules, content, string tables and progress
@@ -595,10 +596,14 @@ onUpdate((dt) => {
   const t = now();
   if (app.caption && t > app.caption.until) app.caption = null;
 });
-onRender(() => {
+onRender(__l10nRender(() => {
   const f = frame();
   drawScreens();
   pointerInput();
   render.render(playState, frameDt, f.width, f.height);
-});
+}));
 
+
+// localization-runtime:menu
+import { installLanguageMenu as __installLanguageMenu } from "./l10n/menu.ts";
+__installLanguageMenu(false);

@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (index.html + css/style.css, built by
 // js/main.js) as starhermit:ui, built every frame: the play HUD (score, best,
 // depth, the containment timer, momentum and the charge pips, Undo and
@@ -13,7 +17,22 @@
 // mode buttons three across, a smaller logo, the tray at the end, no results
 // art). Cards taller than the room scroll, their buttons pinned below.
 // Symbols the system fonts may lack (★, the lock, ♪, ∞) are drawn.
-import { clipboard, frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (index.html + css/style.css, built by
+// js/main.js) as starhermit:ui, built every frame: the play HUD (score, best,
+// depth, the containment timer, momentum and the charge pips, Undo and
+// Pause, the objective line), the hint pill with the 3-2-1 countdown, the
+// sound-caption line, the action tray (HOLD TO DIVE and Undo, reversed for
+// the left-handed tray), the toast, the menu screens (title over the key art,
+// Journey's stage grid, Practice with its theme, Challenges, Daily, Score
+// Chase with its boards) and the overlays (intro, pause, results with the
+// outcome art and the score breakdown, settings, how to play). The browser's
+// media queries are layouts picked by the window's logical size: wide (≥ 1024
+// px: wider cards, larger HUD values), compact (≤ 700 px: smaller HUD values,
+// a narrower hold button) and short landscape (≤ 500 px tall: the title's
+// mode buttons three across, a smaller logo, the tray at the end, no results
+// art). Cards taller than the room scroll, their buttons pinned below.
+// Symbols the system fonts may lack (★, the lock, ♪, ∞) are drawn.
+import { clipboard, frame } from "starhermit:engine";
 import { bindings } from "starhermit:input";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
@@ -64,9 +83,9 @@ function button(b: Btn, width: number | null = null): void {
   if (b.face) opts.content = b.face;
   else if (width != null && buttonWidth(b) > width) {
     const inner = width - 40;
-    opts.content = () => { ui.style({ text: { align: "center" } }).paragraph(b.text, inner, style.includes("btn-primary") ? { weight: "600" } : {}); };
+    opts.content = () => { ui.style(__l10nStyle({ text: { align: "center" } })).paragraph(b.text, inner, style.includes("btn-primary") ? { weight: "600" } : {}); };
   }
-  if (ui.style(...style, s).id(b.id).button(b.text, opts)) {
+  if (ui.style(...__l10nStyle(style), __l10nStyle(s)).id(b.id).button(b.text, opts)) {
     if (!b.silent) audio.cue("ui");
     b.act();
   }
@@ -82,7 +101,7 @@ function para(text: string, width: number, cls?: string | readonly string[] | nu
   if (!text) return;
   const styles: (string | ui.Style)[] = cls ? (typeof cls === "string" ? [cls] : [...cls]) : ["body"];
   if (center) styles.push({ text: { align: "center" } });
-  let u = ui.style(...styles);
+  let u = ui.style(...__l10nStyle(styles));
   if (id) u = u.id(id);
   if (ui.measureText(text, { style: styles }).width / ui.preferences().scale <= width) u.label(text);
   else u.paragraph(text, width);
@@ -242,7 +261,7 @@ function card(key: string, L: Layout, body: (w: number) => void, o: CardOpts): v
     }
   }, { style: o.overlay ? "overlay" : "screen", width: L.lw, height: L.lh, align: "center", justify: "center", spacing: 12 });
 }
-function h2(text: string, id: string): void { ui.style("h2").id(id).heading(text); }
+function h2(text: string, id: string): void { ui.style(__l10nStyle("h2")).id(id).heading(text); }
 function backButton(key: string): (w: number) => void {
   return () => { button({ id: `btn-${key}-back`, text: T("Back"), act: goBack }); };
 }
@@ -293,7 +312,7 @@ function titleScreen(L: Layout): void {
   const build = (): void => {
     const r = ui.column("title-body", () => {
       const logoCls = ["title-logo", ...(short || L.lw < 420 ? ["title-logo-compact"] : L.lw < 700 ? ["title-logo-mid"] : [])];
-      ui.style(...logoCls).id("title-logo").label("CORE BREAKER");
+      ui.style(...__l10nStyle(logoCls)).id("title-logo").label("CORE BREAKER");
       para(T("Hold to smash crystal. Release before armor. Break the core."), w, "subtitle", "subtitle", true);
       const modes: Btn[] = [
         { id: "btn-play", text: T("Play"), style: ["btn", "btn-primary"], act: openPlay },
@@ -368,11 +387,11 @@ function journeyScreen(L: Layout): void {
             const stars = Session.getJourney(lv.id)?.stars ?? 0;
             const locked = !open[k];
             const marks: Glyph[] = stars === 2 ? ["star", "star"] : stars === 1 ? ["star"] : locked ? ["lock"] : ["dot"];
-            const clicked = ui.style("jstage", lv.mastery ? "jstage-mastery" : null, { width: cell, height: 52 }).id(`jstage-${k + 1}`).button(stageLabel(k, locked), {
+            const clicked = ui.style(__l10nStyle("jstage"), __l10nStyle(lv.mastery ? "jstage-mastery" : null), __l10nStyle({ width: cell, height: 52 })).id(`jstage-${k + 1}`).button(stageLabel(k, locked), {
               disabled: locked,
               content: () => {
                 ui.column(`jstage-${k + 1}-face`, () => {
-                  ui.style("jstage-num").label(String(k + 1));
+                  ui.style(__l10nStyle("jstage-num")).label(String(k + 1));
                   glyphs(marks, 11, locked ? c.dim : c.gold);
                 }, { align: "center", spacing: 2 });
               },
@@ -414,7 +433,7 @@ function themeSelect(id: string, label: string, w: number): void {
   ui.row(`${id}-row`, () => {
     para(label, Math.max(80, w - 230), "body");
     ui.spacer();
-    const next = ui.style({ width: Math.min(220, w * 0.6) }).id(id).select(label, idx, o.names.map((n, i) => ({ text: n, disabled: !!o.locked[i] })));
+    const next = ui.style(__l10nStyle({ width: Math.min(220, w * 0.6) })).id(id).select(label, idx, o.names.map((n, i) => ({ text: n, disabled: !!o.locked[i] })));
     if (next !== idx && !o.locked[next]) platform.setSetting("theme", o.ids[next]!);
   }, { width: w, align: "center", spacing: 14 });
 }
@@ -469,15 +488,15 @@ function scoreScreen(L: Layout): void {
     h2(T("Score Chase — Endless Shaft"), "score-h");
     para(T("The shaft never bottoms out and armor thickens with depth. One dive, one score. No undo, no hints."), w, "body", "score-blurb");
     ui.row("score-best", () => {
-      ui.style("small").label(T("Your best:"));
-      ui.style("strong").id("score-best-val").label(fmtScore(Session.getBest("score")));
+      ui.style(__l10nStyle("small")).label(T("Your best:"));
+      ui.style(__l10nStyle("strong")).id("score-best-val").label(fmtScore(Session.getBest("score")));
     }, { spacing: 6, align: "center" });
     ui.column("score-board", () => {
       const rows = app.board;
       if (rows && rows.length) {
-        ui.style("board-head").label(T("— platform board —"));
+        ui.style(__l10nStyle("board-head")).label(T("— platform board —"));
         rows.slice(0, 10).forEach((e, i) => para(`#${i + 1} ${fmtScore(e.score)} — ${e.name}`, w, e.you ? "board-you" : "board-row", `pboard-${i}`));
-        ui.style("board-head").label(T("— this device —"));
+        ui.style(__l10nStyle("board-head")).label(T("— this device —"));
       }
       const local = localBoard();
       local.slice(0, 10).forEach((row, i) => {
@@ -561,10 +580,10 @@ function resultsOverlay(L: Layout): void {
     ui.grid("res-breakdown", () => {
       for (const [a, b] of rows) {
         para(a, lblW - 16, "res-td");
-        ui.style("res-num").label(b);
+        ui.style(__l10nStyle("res-num")).label(b);
       }
-      ui.gridRow("res-total-row").style("res-total").label(T("Total"));
-      ui.style("res-total", { text: { align: "end" } }).id("res-total").label(fmtScore(s.score.total));
+      ui.gridRow("res-total-row").style(__l10nStyle("res-total")).label(T("Total"));
+      ui.style(__l10nStyle("res-total"), __l10nStyle({ text: { align: "end" } })).id("res-total").label(fmtScore(s.score.total));
     }, { columns: [{ width: lblW }, { fr: 1, align: "end" }], gap: 0, width: w });
     // progress line (the ★ marks of "★★ Par beaten" / "★ Stage clear" are drawn)
     const prog: string[] = [];
@@ -610,17 +629,17 @@ function settingsOverlay(L: Layout): void {
       const next = ui.id(`set-${key}`).checkbox(label, cur);
       if (next !== cur) { audio.cue("ui"); platform.setSetting(key, next ? 1 : 0); }
     };
-    ui.style("h3").label(T("Audio"));
+    ui.style(__l10nStyle("h3")).label(T("Audio"));
     check("captions", T("Sound captions"));
-    ui.style("h3").label(T("Accessibility & controls"));
+    ui.style(__l10nStyle("h3")).label(T("Accessibility & controls"));
     check("leftHanded", T("Left-handed tray"));
     check("holdToggle", T("Toggle instead of hold"));
     check("timingAssist", T("Timing assist (stronger hints)"));
-    ui.style("h3").label(T("Theme"));
+    ui.style(__l10nStyle("h3")).label(T("Theme"));
     themeSelect("set-theme", T("Practice theme"), w);
     // Volumes, mute, graphics, language, key bindings, text size, contrast and reduced motion are the runtime's Options.
     para(T("Sound, graphics, language, controls, text size, high contrast and reduced motion are in the StarHermit Options."), w, "small", "options-note");
-    button({ id: "btn-options", text: T("Open Options"), act: () => openMenu() }, Math.min(w, buttonWidth({ id: "", text: T("Open Options"), act: () => undefined })));
+    button({ id: "btn-options", text: T("Open Options"), act: () => __l10nOptions() }, Math.min(w, buttonWidth({ id: "", text: T("Open Options"), act: () => undefined })));
   }, {
     maxW: 560, overlay: true,
     footer: (w) => menuCol("settings-actions", [{ id: "btn-settings-close", text: T("Done"), style: ["btn", "btn-primary"], act: closeOverlay }], w),
@@ -650,11 +669,11 @@ function helpOverlay(L: Layout): void {
     ];
     cards.forEach(([h, p], i) => {
       ui.column(`help-card-${i}`, () => {
-        ui.style("strong").label(`${h}.`);
+        ui.style(__l10nStyle("strong")).label(`${h}.`);
         para(p, w, "body");
       }, { spacing: 2, width: w });
     });
-    ui.style("h3").label(T("Controls"));
+    ui.style(__l10nStyle("h3")).label(T("Controls"));
     const ctrls = [
       T("Mouse / touch: hold anywhere on the playfield (or the HOLD button) to dive; release to hover."),
       T(settings.holdToggle ? "{keys}: hold to dive, release to hover (toggle mode: tap)." : "{keys}: hold to dive, release to hover.", { keys: keysFor("dive") }),
@@ -685,8 +704,8 @@ function playLayer(L: Layout): void {
   const valCls = ["stat-val", ...(L.wide ? ["stat-val-wide"] : L.narrow ? ["stat-val-compact"] : [])];
   const stat = (id: string, lbl: string, val: string, extra?: string | null): void => {
     ui.column(`stat-${id}`, () => {
-      ui.style("stat-lbl").label(lbl);
-      ui.style(...valCls, extra ?? null).id(`hud-${id}`).label(val);
+      ui.style(__l10nStyle("stat-lbl")).label(lbl);
+      ui.style(...__l10nStyle(valCls), __l10nStyle(extra ?? null)).id(`hud-${id}`).label(val);
     }, { spacing: 0 });
   };
   // Score, Best, Depth, Time, Momentum, Charge.
@@ -695,9 +714,9 @@ function playLayer(L: Layout): void {
       stat("score", T("Score"), fmtScore(liveScore(s)));
       stat("best", T("Best"), fmtScore(hudBest()));
       ui.column("stat-depth", () => {
-        ui.style("stat-lbl").label(T("Depth"));
+        ui.style(__l10nStyle("stat-lbl")).label(T("Depth"));
         ui.row("hud-depth-row", () => {
-          ui.style(...valCls).id("hud-depth").label(cfg.endless ? `${s.depth}/` : `${s.depth}/${s.layers.length}`);
+          ui.style(...__l10nStyle(valCls)).id("hud-depth").label(cfg.endless ? `${s.depth}/` : `${s.depth}/${s.layers.length}`);
           if (cfg.endless) glyphs(["infinity"], L.narrow ? 14 : 18, c.text);
         }, { spacing: 2, align: "center" });
       }, { spacing: 0 });
@@ -708,7 +727,7 @@ function playLayer(L: Layout): void {
       stat("mult", T("Momentum"), `×${s.mult}`);
       const max = cfg.chargeMax || 0;
       ui.column("stat-charge", () => {
-        ui.style("stat-lbl").label(T("Charge"));
+        ui.style(__l10nStyle("stat-lbl")).label(T("Charge"));
         ui.widget(T("Charge {n} of {max}", { n: s.charge, max }), {
           role: "image", size: { width: Math.max(14, max * 18 - 4), height: L.wide ? 28 : 22 },
           draw: (r) => {
@@ -748,7 +767,7 @@ function playLayer(L: Layout): void {
     const cls = ["hintbar", ...(hint.cls ? [hint.cls] : [])];
     ui.place("hintbar", L.shortLand ? { anchor: "bottom", x: 0, y: hintY } : { anchor: "bottom", y: hintY }, () => {
       ui.column("hintbar-box", () => {
-        ui.style(hint.countdown ? "countdown-text" : "hintbar-text").id("hint-text").label(hint.text);
+        ui.style(__l10nStyle(hint.countdown ? "countdown-text" : "hintbar-text")).id("hint-text").label(hint.text);
       }, { style: cls, align: "center" });
     });
   }
@@ -757,7 +776,7 @@ function playLayer(L: Layout): void {
     ui.place("caption", { anchor: "bottom", y: L.shortLand ? 12 : trayH + 4 }, () => {
       ui.row("caption-row", () => {
         glyphs(["note"], 12, c.dim);
-        ui.style("caption").id("caption-text").label(text);
+        ui.style(__l10nStyle("caption")).id("caption-text").label(text);
       }, { spacing: 4, align: "center" });
     });
   }
@@ -777,7 +796,7 @@ function playLayer(L: Layout): void {
           const k = L.sc;
           const fs = 17 * k * ui.preferences().textScale;
           const lines = wrapHold(holdLabel, r.width - 16 * k, fs);
-          lines.forEach((ln, i) => draw.text(ln, r.x + r.width / 2, r.y + r.height / 2 - (lines.length * fs * 1.15) / 2 + i * fs * 1.15, { size: fs, weight: "700", color: c.text, align: "center" }));
+          lines.forEach((ln, i) => draw.text(ln, r.x + r.width / 2, r.y + r.height / 2 - (lines.length * fs * 1.15) / 2 + i * fs * 1.15, __l10nDrawOptions({ size: fs, weight: "700", color: c.text, align: "center" })));
         },
       });
       // The button holds while pressed (pointer or finger); Enter / Space on it act as the dive keys do.
@@ -788,13 +807,13 @@ function playLayer(L: Layout): void {
   });
 }
 function wrapHold(text: string, maxW: number, size: number): string[] {
-  if (draw.measureText(text, { size, weight: "700" }).width <= maxW) return [text];
+  if (draw.measureText(text, __l10nDrawOptions({ size, weight: "700" })).width <= maxW) return [text];
   const words = text.split(" ");
   const lines: string[] = [];
   let cur = "";
   for (const wd of words) {
     const t = cur ? `${cur} ${wd}` : wd;
-    if (cur && draw.measureText(t, { size, weight: "700" }).width > maxW) { lines.push(cur); cur = wd; } else cur = t;
+    if (cur && draw.measureText(t, __l10nDrawOptions({ size, weight: "700" })).width > maxW) { lines.push(cur); cur = wd; } else cur = t;
   }
   if (cur) lines.push(cur);
   return lines;
