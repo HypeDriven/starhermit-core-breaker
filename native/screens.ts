@@ -202,7 +202,7 @@ function firstLabel(): string | null {
   }
 }
 
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   // A screen or overlay that just opened focuses its first (or primary) control once its layout settled.
   if (app.focusNext && frame().frame - app.openedFrame >= 2) {
@@ -832,4 +832,11 @@ function hintText(): { text: string; cls: string | null; countdown?: boolean } |
     : T("gap — fall through");
   const ms = settings.timingAssist ? Math.max(0, p.ms - 100) : p.ms;
   return { text: `${seg} · ${ms < 500 ? "<0.5s" : `${(ms / 1000).toFixed(1)}s`}`, cls: p.willCrash ? "hintbar-danger" : p.segment === 1 ? "hintbar-armor" : null };
+}
+
+export function drawScreens(): void {
+  if (!(app.overlay === "help")) { drawScreensImmediate(); return; }
+  const actions = ["dive","toggle","pause","undo","retry","back"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
 }
