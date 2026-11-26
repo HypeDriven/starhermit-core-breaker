@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:00:59.545663+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T15:58:39.715647+00:00",
+    "coverArtUpdatedAt": "2026-11-26T20:13:42.717325+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T15:58:39.70468+00:00",
+      "deployedAt": "2026-11-26T20:13:42.705733+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.50.0",
+      "engineVersion": "1.51.0",
       "deployWarning": null
     },
     "description": "Smash through a rotating crystal tower, releasing before armored plates strike to reach the golden core.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T15:58:38.829Z",
-  "sourceCommit": "8850811f7dca1520bd730d7a50ebead9d087ced8",
-  "bytesReceived": 4000597,
-  "archiveSha256": "17e9c208c7a4d5a3a51cc92d69e3ddae71ebfd7caa6946a1e7c592cb48177c38",
+  "publishedAt": "2026-11-26T20:13:42.835Z",
+  "sourceCommit": "93c6b91668e4cec23f1d88d24be795c8b2b6fb2f",
+  "bytesReceived": 4000643,
+  "archiveSha256": "5a5aa62f435d76a031e8a6037f708d23e3858332f8a97abea67821bb9ab3622a",
   "indexSha256": "483011476d1ecbc48f56a3c716889568f7aa5a069a131f556b61f604565e1f03",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 4000597,
+    "bytesReceived": 4000643,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.50.0",
+    "engineVersion": "1.51.0",
     "deployWarning": null
   },
   "liveVerification": {
