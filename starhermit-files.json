@@ -43,7 +43,7 @@
     "native/render.ts": {"sha256": "fcb618ecc393f763a39633dbb7140e7ea44b41eb06e6af6a91e9a228048920a9", "size": 30213},
     "native/screens.ts": {"sha256": "0677ac54587bb6d7a0e7330258126888dc5780f8ccc0c88d6b6784da8d2dc3a3", "size": 46819},
     "native/style.ts": {"sha256": "65746d8d8c2c92bcfded1ab85d33eb0d513db630dea3244e37c5445d26649f08", "size": 2541},
-    "publication.json": {"sha256": "35c502545b718437017fe4f55db8bdb620fb5d0a7824bc368810500fbc474ee9", "size": 4137},
+    "publication.json": {"sha256": "97ac9d53754a242f1bb9ed53138fffc930dca9950193af94d5f5d5e1a0b5c756", "size": 4137},
     "score-script.js": {"sha256": "618e89ae43448ea4b831f8242449c7de7a518b930ed1889451ce8b19ad400bbc", "size": 2489},
     "sfx/achievement-unlock.opus": {"sha256": "5f228edba483adcce6785b9f88368d711cefb4a16e174a4f8f3c01f0dbbf92aa", "size": 29643},
     "sfx/armor-crash.opus": {"sha256": "8843d97c6dc89b9cc79881e1037876644dae6ebc0ceafedeb67effbaf2597dc5", "size": 21879},
