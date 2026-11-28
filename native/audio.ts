@@ -47,7 +47,6 @@ export function loadSfx(): void {
   for (const name of new Set(Object.values(SAMPLES))) {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
-  renderTones().catch((e: unknown) => console.warn(`audio: ${String(e)}`));
 }
 /** cb(captionKey, vars) for each captioned cue (an English key; "crystal break ×{n}" carries n). */
 export function setOnCaption(cb: (key: string, vars: Record<string, string | number>) => void): void { onCaption = cb; }
@@ -139,7 +138,17 @@ export function stopAmbience(): void {
 export function setPaused(on: boolean): void { paused = on; }
 
 /** Each frame once the mixer runs: the hum, then the music's steps by mixer time. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  void (async () => {
+    renderTones().catch((e: unknown) => console.warn(`audio: ${String(e)}`));
+  })();
+}
+
 export function update(): void {
+  startBeds();
   if (context.state !== "running") return; // starting the hum and music still waits for the mixer
   try {
     const humOn = wantHum && !paused;
